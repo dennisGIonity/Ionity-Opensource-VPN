@@ -1,0 +1,1089 @@
+<!doctype html>
+<!--
+  Ionity's Opensource VPN — per-device region control for a Gate^Flame box.
+  Doc: IOV-APP-0.2.0 | Ionity (Pty) Ltd — AEDI | Governance: Policy 986 AED
+  Licence: CC BY-NC-SA 4.0 (see LICENSE) | Behaviour ported from Gate^Flame Shield
+  (src/mobile/screens/ShieldScreen.tsx, kioskClient.ts, nodeDiscovery.ts, AppPairingScreen.tsx).
+  (c) 2018-2026 Antwerp Designs | Ionity (Pty) Ltd — TM2 | https://www.ionity.today
+
+  SOURCE FILE. `node scripts/build.mjs` inlines fonts + wordmark and writes www/index.html.
+  The box never carries tunnelled traffic: it records each device's region and hands
+  that device a connection file. See docs/DESIGN.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#07080d">
+<meta name="description" content="Ionity's Opensource VPN — give every device in your home its own region, served by your Gate^Flame box.">
+<title>Ionity Open VPN</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235746e3'/%3E%3Cstop offset='.55' stop-color='%2300d4b8'/%3E%3Cstop offset='1' stop-color='%2300d2ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='%2307080d'/%3E%3Cpath d='M32 9l18 7v13c0 12-8 20-18 25-10-5-18-13-18-25V16z' fill='none' stroke='url(%23g)' stroke-width='4.5' stroke-linejoin='round'/%3E%3Cpath d='M23 31a9 9 0 0 1 18 0' fill='none' stroke='url(%23g)' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='33' r='4.5' fill='url(%23g)'/%3E%3C/svg%3E">
+<style>
+@font-face{font-family:"Outfit";font-weight:100 900;font-display:swap;src:url(data:font/woff2;base64,__F_OUTFIT__) format("woff2")}
+@font-face{font-family:"Plus Jakarta Sans";font-weight:200 800;font-display:swap;src:url(data:font/woff2;base64,__F_JAKARTA__) format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:100 800;font-display:swap;src:url(data:font/woff2;base64,__F_MONO__) format("woff2")}
+
+/* Ionity Global design tokens v1.1 (ionity-tokens.json) + ionity.co.za near-black.
+   No color-mix()/light-dark(): Android System WebView on older phones lacks them. */
+:root{
+  --purple:#5746e3; --teal:#00d4b8; --cyan:#00d2ff; --blue:#1d5bb5;
+  --grad:linear-gradient(115deg,#5746e3 0%,#00d4b8 58%,#00d2ff 100%);
+  --ok:#00d4b8; --warn:#f2b54a; --bad:#ff5d7a;
+  --bg:#07080d; --bg2:#0b0d12; --s1:#0f121a; --s2:#151a25; --s3:#1b2130;
+  --line:rgba(231,235,242,.075); --line2:rgba(231,235,242,.14);
+  --tx:#e7ebf2; --mu:#8b93a4; --mu2:#5f6779;
+  --glass:rgba(11,13,18,.72);
+  --teal-a:rgba(0,212,184,.12); --teal-b:rgba(0,212,184,.35); --purple-a:rgba(87,70,227,.18);
+  --warn-a:rgba(242,181,74,.10); --warn-b:rgba(242,181,74,.38); --bad-a:rgba(255,93,122,.10); --bad-b:rgba(255,93,122,.38);
+  --shadow:0 24px 60px -28px rgba(0,0,0,.8);
+  --display:"Outfit","Segoe UI",system-ui,sans-serif;
+  --sans:"Plus Jakarta Sans","Inter","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --mono:"JetBrains Mono","Cascadia Mono",ui-monospace,Consolas,monospace;
+  --r1:10px; --r2:16px; --r3:22px;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f4f5f9; --bg2:#eef0f5; --s1:#ffffff; --s2:#f3f5f9; --s3:#e9ecf3;
+  --line:rgba(18,22,42,.08); --line2:rgba(18,22,42,.15);
+  --tx:#11152a; --mu:#5a6377; --mu2:#8a92a3; --glass:rgba(244,245,249,.78);
+  --teal-a:rgba(0,170,148,.10); --teal-b:rgba(0,170,148,.38); --purple-a:rgba(87,70,227,.10);
+  --shadow:0 20px 50px -30px rgba(17,21,42,.35);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]){
+    --bg:#f4f5f9; --bg2:#eef0f5; --s1:#ffffff; --s2:#f3f5f9; --s3:#e9ecf3;
+    --line:rgba(18,22,42,.08); --line2:rgba(18,22,42,.15);
+    --tx:#11152a; --mu:#5a6377; --mu2:#8a92a3; --glass:rgba(244,245,249,.78);
+    --teal-a:rgba(0,170,148,.10); --teal-b:rgba(0,170,148,.38); --purple-a:rgba(87,70,227,.10);
+    --shadow:0 20px 50px -30px rgba(17,21,42,.35);
+    color-scheme:light;
+  }
+  :root:not([data-theme]) .globe{opacity:.22}
+  :root:not([data-theme]) .hero-f{background:rgba(17,21,42,.02)}
+  :root:not([data-theme]) .bgfx::after{opacity:.45}
+}
+
+*{box-sizing:border-box}
+html{overflow-x:hidden}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;-webkit-tap-highlight-color:transparent;text-rendering:optimizeLegibility}
+body{min-height:100vh;min-height:100dvh;overflow-x:hidden;overflow-x:clip}
+button,input{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer;-webkit-user-select:none;user-select:none}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:6px}
+img{display:block}
+.mono{font-family:var(--mono)}
+.grad-t{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* backdrop: hairline grid + brand glow, like ionity.co.za */
+.bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bgfx::before{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(ellipse 90% 55% at 50% 0%,#000 25%,transparent 75%);mask-image:radial-gradient(ellipse 90% 55% at 50% 0%,#000 25%,transparent 75%);opacity:.7}
+.bgfx::after{content:"";position:absolute;left:50%;top:-38vh;width:120vw;height:70vh;transform:translateX(-50%);border-radius:50%;
+  background:radial-gradient(closest-side,rgba(87,70,227,.30),rgba(0,212,184,.10) 60%,transparent);filter:blur(30px)}
+:root[data-theme="light"] .bgfx::after{opacity:.45}
+
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 18px calc(env(safe-area-inset-bottom) + 40px)}
+
+/* top bar */
+.bar{position:sticky;top:0;z-index:20;margin:0 -18px;width:calc(100% + 36px);padding:calc(env(safe-area-inset-top) + 12px) 18px 12px;display:flex;align-items:center;gap:12px;
+  background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(18px);backdrop-filter:saturate(1.4) blur(18px);border-bottom:1px solid var(--line)}
+.wm{height:17px;width:auto}
+.vr{width:1px;height:18px;background:var(--line2)}
+.prod{font:600 10.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--mu)}
+.sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--line2);background:var(--s1);font:500 11.5px/1 var(--mono);color:var(--mu);white-space:nowrap}
+.ib{width:36px;height:36px;border-radius:11px;border:1px solid var(--line2);background:var(--s1);display:grid;place-items:center;color:var(--tx);transition:background .2s}
+.ib:active{background:var(--s2)}
+.ib svg{width:18px;height:18px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mu2);flex:none;display:inline-block}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px var(--teal-a)}
+.dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+.dot.pulse{animation:pulse 1.3s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+
+/* layout */
+.grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;padding-top:24px}
+@media (min-width:980px){.grid2{grid-template-columns:minmax(0,1.15fr) minmax(380px,.85fr);align-items:start}.side{position:sticky;top:84px}}
+.side:empty{display:none}
+
+/* banners */
+.note{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--s1);font-size:13.5px;line-height:1.5;margin-bottom:14px}
+.note.warn{border-color:var(--warn-b);background:var(--warn-a)} .note.bad{border-color:var(--bad-b);background:var(--bad-a)}
+.note b{font-weight:700}
+.note .x{margin-left:auto;background:none;border:0;color:var(--cyan);font-weight:600;padding:0;white-space:nowrap;font-size:13px}
+.note svg{width:18px;height:18px;flex:none;margin-top:1px}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-radius:var(--r3);border:1px solid var(--line2);background:linear-gradient(160deg,var(--s2) 0%,var(--s1) 55%);box-shadow:var(--shadow)}
+.hero::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,rgba(87,70,227,.55),rgba(0,212,184,.25) 40%,transparent 70%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.hero-in{position:relative;padding:22px 22px 0;display:flex;gap:18px;align-items:center}
+.globe{position:absolute;right:-80px;top:-60px;width:290px;height:290px;opacity:.38;pointer-events:none;-webkit-mask-image:linear-gradient(180deg,#000 40%,transparent 78%);mask-image:linear-gradient(180deg,#000 40%,transparent 78%)}
+:root[data-theme="light"] .globe{opacity:.22}
+.globe g{transform-origin:150px 150px;animation:rot 60s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.eyebrow{font:600 10.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--mu);display:flex;align-items:center;gap:8px}
+.big{font:600 64px/0.95 var(--display);letter-spacing:-.04em;margin:12px 0 6px}
+.big small{font:500 22px var(--display);color:var(--mu);letter-spacing:-.01em;margin-left:6px}
+.lead{color:var(--mu);font-size:14px;margin:0;max-width:30ch}
+.ring{width:112px;height:112px;flex:none;margin-left:auto;position:relative;z-index:1}
+.ring .arc{transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)}
+.stats{position:relative;display:grid;grid-template-columns:repeat(3,1fr);margin-top:20px;border-top:1px solid var(--line)}
+.stat{padding:14px 16px 16px;border-left:1px solid var(--line);min-width:0}
+.stat:first-child{border-left:0;padding-left:22px}
+.stat .k{font:600 9.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--mu2);white-space:nowrap}
+.stat .v{font:600 18px/1.2 var(--display);margin-top:7px;display:flex;align-items:center;gap:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .v small{font:500 12px var(--sans);color:var(--mu)}
+.hero-f{position:relative;display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid var(--line);background:rgba(0,0,0,.12)}
+:root[data-theme="light"] .hero-f{background:rgba(17,21,42,.02)}
+.link{background:none;border:0;padding:0;color:var(--cyan);font-weight:600;font-size:13px}
+:root[data-theme="light"] .link{color:#0a7fbf}
+
+/* section headings: "01 // Devices" */
+.sh{display:flex;align-items:center;gap:12px;margin:30px 2px 12px}
+.sh .n{font:600 11px/1 var(--mono);letter-spacing:.12em}
+.sh h2{margin:0;font:600 11px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--mu)}
+.sh .rule{flex:1;height:1px;background:var(--line)}
+.seg{display:inline-flex;padding:3px;border-radius:12px;border:1px solid var(--line2);background:var(--s1)}
+.seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font:600 12px/1 var(--sans);color:var(--mu);transition:background .2s,color .2s}
+.seg button[aria-pressed="true"]{background:var(--s3);color:var(--tx)}
+.seg.full{display:flex}.seg.full button{flex:1;padding:9px 10px}
+
+/* panel + device rows */
+.panel{border-radius:var(--r3);border:1px solid var(--line2);background:var(--s1);overflow:hidden;box-shadow:var(--shadow)}
+.dev{display:flex;align-items:center;gap:14px;padding:14px 16px;border-top:1px solid var(--line);position:relative;transition:background .2s}
+.dev:first-child{border-top:0}
+.dev.sel{background:var(--s2)}
+.dev.sel::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--grad)}
+.dev .tap{flex:1;min-width:0;display:flex;align-items:center;gap:14px;background:none;border:0;padding:0;text-align:left}
+.dev .tap:active{opacity:.7}
+.tile{width:42px;height:42px;border-radius:13px;flex:none;display:grid;place-items:center;border:1px solid var(--line2);background:var(--s2);color:var(--mu);position:relative;transition:background .3s,color .3s,border-color .3s}
+.tile svg{width:21px;height:21px}
+.dev.on .tile{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 8px 22px -10px rgba(0,212,184,.8)}
+.dev .meta{min-width:0;flex:1}
+.dev .nm{font-weight:650;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.005em}
+.dev .sub{display:flex;align-items:center;gap:7px;margin-top:3px;font-size:12.5px;color:var(--mu);white-space:nowrap;overflow:hidden}
+.dev .sub .m{font:500 11px var(--mono);overflow:hidden;text-overflow:ellipsis}
+.dev .sub .r{color:var(--tx);font-weight:600}
+.cc{display:inline-grid;place-items:center;min-width:26px;height:18px;padding:0 5px;border-radius:5px;font:700 10px/1 var(--mono);letter-spacing:.04em;color:var(--tx);background:var(--s3);border:1px solid var(--line2)}
+.dev.on .cc{background:var(--teal-a);border-color:var(--teal-b);color:var(--teal)}
+.tag{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;font:600 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);color:var(--mu)}
+.tag.v{border-color:var(--teal-b);color:var(--teal)}
+.off-tag{color:var(--warn)}
+
+/* switch */
+.sw{position:relative;width:48px;height:28px;flex:none;border-radius:999px;border:1px solid var(--line2);background:var(--s3);padding:0;transition:background .25s,border-color .25s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .28s cubic-bezier(.3,1.35,.5,1)}
+.sw[aria-checked="true"]{background:var(--grad);border-color:transparent}
+.sw[aria-checked="true"]::after{transform:translateX(20px)}
+.sw:disabled{opacity:.45}
+.sw.busy::after{animation:pulse .9s infinite}
+
+.empty{padding:28px 20px;text-align:center;color:var(--mu);font-size:13.5px;line-height:1.55}
+.sk{height:70px;border-top:1px solid var(--line);background:linear-gradient(90deg,transparent,var(--s2),transparent);background-size:200% 100%;animation:sk 1.4s linear infinite}
+.sk:first-child{border-top:0}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+
+/* continents overview */
+.ct{display:grid;grid-template-columns:auto 1fr auto;gap:6px 14px;align-items:center;padding:14px 16px;border-top:1px solid var(--line)}
+.ct:first-child{border-top:0}
+.ct .l{font-weight:600;font-size:14px}
+.ct .l small{display:block;font-weight:500;font-size:12px;color:var(--mu)}
+.bar-t{height:6px;border-radius:6px;background:var(--s3);overflow:hidden;grid-column:1/-1}
+.bar-t i{display:block;height:100%;border-radius:inherit;background:var(--grad)}
+.ct .c{font:600 12px var(--mono);color:var(--mu)}
+
+/* how it works */
+.how{display:grid;grid-template-columns:repeat(3,1fr);border-radius:var(--r3);border:1px solid var(--line2);background:var(--s1);overflow:hidden}
+.how div{padding:16px;border-left:1px solid var(--line)} .how div:first-child{border-left:0}
+.how b{display:block;font:600 14px var(--display);margin:8px 0 4px}
+.how p{margin:0;font-size:12.5px;color:var(--mu);line-height:1.5}
+.how .n{font:600 10.5px var(--mono);letter-spacing:.14em}
+@media (max-width:560px){.how{grid-template-columns:1fr}.how div{border-left:0;border-top:1px solid var(--line)}.how div:first-child{border-top:0}}
+
+/* chooser (sheet + side panel share this) */
+.ch-h{display:flex;align-items:center;gap:14px;padding:18px 18px 16px;border-bottom:1px solid var(--line)}
+.ch-h .tile{width:48px;height:48px;border-radius:15px}
+.ch-h h3{margin:0;font:600 20px/1.2 var(--display);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-h p{margin:3px 0 0;font:500 11.5px var(--mono);color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-b{padding:16px 18px 22px}
+.ch-sec{font:600 10.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--mu2);margin:22px 2px 10px;display:flex;align-items:center;gap:8px}
+.ch-sec:first-child{margin-top:4px}
+.state{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--s2)}
+.state.on{border-color:var(--teal-b);background:linear-gradient(135deg,var(--teal-a),var(--purple-a))}
+.state .t{flex:1;min-width:0}
+.state b{display:block;font-weight:650;font-size:14.5px}
+.state span{font-size:12.5px;color:var(--mu);display:flex;align-items:center;gap:6px;margin-top:2px}
+.opts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.opt{position:relative;text-align:left;padding:14px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--s1);transition:border-color .2s,background .2s,transform .15s;min-height:92px}
+.opt:active{transform:scale(.985)}
+.opt b{display:block;font:600 15px/1.25 var(--display);margin-top:10px}
+.opt small{display:block;font-size:11.5px;color:var(--mu);margin-top:3px;line-height:1.4}
+.opt .gl{width:22px;height:22px;color:var(--cyan)}
+.opt[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-a)}
+.opt[aria-pressed="true"]::after{content:"";position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;background:var(--grad) center/11px no-repeat;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E"),var(--grad)}
+.opt:disabled{opacity:.42}
+.search{width:100%;height:44px;border-radius:12px;border:1px solid var(--line2);background:var(--s2);padding:0 14px 0 40px;outline:none;font-size:14.5px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b93a4' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:13px center;background-size:17px}
+.search:focus{border-color:var(--teal)}
+.list{margin-top:10px;border-radius:var(--r2);border:1px solid var(--line2);overflow:hidden;background:var(--s1)}
+.li{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:0;border-top:1px solid var(--line);background:none;text-align:left}
+.li:first-child{border-top:0}
+.li .t{flex:1;min-width:0}
+.li b{font-weight:600;font-size:14px}
+.li small{display:block;color:var(--mu);font-size:11.5px}
+.li .ck{width:18px;height:18px;color:var(--teal);opacity:0}
+.li[aria-pressed="true"]{background:var(--teal-a)} .li[aria-pressed="true"] .ck{opacity:1}
+.li:disabled{opacity:.42}
+
+/* buttons, fields */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:50px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);background:var(--s2);font:650 14.5px/1 var(--sans);transition:transform .15s,opacity .2s}
+.btn:active{transform:scale(.985)}
+.btn.pri{border:0;color:#fff;background:var(--grad);box-shadow:0 14px 30px -14px rgba(87,70,227,.9)}
+.btn.ghost{background:none}
+.btn.danger{background:none;color:var(--bad);border-color:var(--bad-b)}
+.btn:disabled{opacity:.5}
+.btn svg{width:18px;height:18px}
+.row2{display:flex;gap:10px}
+.row2 .btn{width:auto;flex:none}
+.fld{display:block;margin-bottom:14px}
+.fld>span{display:block;font:600 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--mu);margin:0 2px 8px}
+.in{width:100%;height:50px;border-radius:14px;border:1px solid var(--line2);background:var(--s2);padding:0 15px;outline:none;font-size:16px;transition:border-color .2s,box-shadow .2s}
+.in:focus{border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-a)}
+.in.code{font:600 26px/1 var(--mono);letter-spacing:.45em;text-align:center;padding-left:.45em;height:62px}
+.hint{font-size:12.5px;color:var(--mu);line-height:1.55;margin:8px 2px 0}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:12px 0 0;padding:14px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--s2);font-size:13px}
+.spec dt{color:var(--mu);font:600 10px/1.9 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.spec dd{margin:0;font:500 12.5px/1.6 var(--mono);word-break:break-all}
+.res{margin-top:12px;font-size:13.5px;line-height:1.55}
+
+/* onboarding */
+.ob{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 34px) 0 0}
+.ob .wm{height:22px;margin:0 auto 28px}
+.ob h1{font:600 44px/1.02 var(--display);letter-spacing:-.035em;margin:14px 0 14px;text-align:center}
+.ob .eyebrow{justify-content:center}
+.ob .lead{margin:0 auto 26px;text-align:center;max-width:38ch;font-size:15px}
+.card{border-radius:var(--r3);border:1px solid var(--line2);background:var(--s1);box-shadow:var(--shadow);overflow:hidden}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+.steps div{padding:12px 14px;font:600 10px/1.3 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mu2);border-left:1px solid var(--line);position:relative}
+.steps div:first-child{border-left:0}
+.steps div.on{color:var(--tx)} .steps div.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--grad)}
+.steps div.done{color:var(--teal)}
+.card-b{padding:20px}
+.or{display:flex;align-items:center;gap:12px;margin:18px 0;font:600 10px var(--mono);letter-spacing:.2em;color:var(--mu2);text-transform:uppercase}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.prog{margin-top:14px;border-radius:var(--r2);border:1px solid var(--line);background:var(--s2);padding:4px 14px}
+.prog div{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:12.5px;color:var(--mu);border-top:1px solid var(--line)}
+.prog div:first-child{border-top:0}
+.prog .m{font:500 11.5px var(--mono);margin-left:auto;color:var(--mu2)}
+.prog i{display:block;height:3px;border-radius:3px;background:var(--grad);transition:width .2s}
+.found{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;margin-top:10px;border-radius:var(--r2);border:1px solid var(--teal-b);background:var(--teal-a);text-align:left}
+.found .t{flex:1;min-width:0}
+.found b{display:block;font:600 14px var(--mono)}
+.found small{color:var(--mu);font-size:12px}
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:22px;border-radius:var(--r3);border:1px solid var(--line);overflow:hidden}
+.feats div{padding:14px 12px;border-left:1px solid var(--line);font-size:12px;color:var(--mu);line-height:1.45}
+.feats div:first-child{border-left:0}
+.feats b{display:block;color:var(--tx);font:600 13.5px var(--display);margin:8px 0 2px}
+.feats svg{width:20px;height:20px;color:var(--teal)}
+
+/* sheet */
+dialog.sheet{margin:auto auto 0;width:100%;max-width:600px;max-height:90vh;max-height:90dvh;padding:0;border:1px solid var(--line2);border-bottom:0;border-radius:26px 26px 0 0;background:var(--bg2);color:var(--tx);overflow:hidden}
+dialog.sheet[open]{display:flex;flex-direction:column;animation:up .34s cubic-bezier(.2,.9,.25,1)}
+dialog.sheet::backdrop{background:rgba(3,4,8,.62);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
+@keyframes up{from{transform:translateY(48px);opacity:0}}
+.grab{width:40px;height:5px;border-radius:5px;background:var(--line2);margin:10px auto 0;flex:none}
+.sheet-sc{overflow:auto;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom)}
+.sheet-x{position:absolute;top:18px;right:14px}
+.prose{font-size:14px;line-height:1.65}
+.prose p{margin:0 0 12px}
+.prose .muted{color:var(--mu);font-size:13px}
+
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 22px);z-index:60;transform:translate(-50%,16px);opacity:0;pointer-events:none;
+  display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:12px 16px;border-radius:14px;border:1px solid var(--line2);background:var(--s2);box-shadow:var(--shadow);font-size:13.5px;transition:.28s cubic-bezier(.2,.9,.25,1)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.foot{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:11.5px;color:var(--mu2)}
+.foot .wm{height:12px;opacity:.85}
+.foot a{color:var(--mu)}
+.foot .r{margin-left:auto}
+@media (max-width:560px){.foot{flex-direction:column;align-items:flex-start;gap:6px}.foot .r{margin-left:0}}
+
+@media (max-width:420px){.wide-only{display:none}.big{font-size:54px}.ring{width:92px;height:92px}.stat .v{font-size:16px}.ob h1{font-size:38px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="bgfx" aria-hidden="true"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<linearGradient id="ig" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5746e3"/><stop offset=".58" stop-color="#00d4b8"/><stop offset="1" stop-color="#00d2ff"/></linearGradient>
+<symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M10.5 18.5h3"/></symbol>
+<symbol id="i-laptop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="5" width="16" height="11" rx="1.6"/><path d="M2 19h20"/></symbol>
+<symbol id="i-tv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="2.5" y="4.5" width="19" height="13" rx="2"/><path d="M8 21h8"/></symbol>
+<symbol id="i-console" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 8h11a4.5 4.5 0 0 1 4.5 4.5v.3a3.7 3.7 0 0 1-6.6 2.3L14.5 14h-5l-.9 1.1A3.7 3.7 0 0 1 2 12.8v-.3A4.5 4.5 0 0 1 6.5 8z"/><path d="M7 10.5v3.5M5.25 12.25h3.5M16 11.5h.01M18 13.5h.01"/></symbol>
+<symbol id="i-chip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx=".8"/><path d="M9 2.5V6M15 2.5V6M9 18v3.5M15 18v3.5M2.5 9H6M2.5 15H6M18 9h3.5M18 15h3.5"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9.3"/><path d="M2.7 12h18.6M12 2.7c2.8 2.6 2.8 16 0 18.6M12 2.7c-2.8 2.6-2.8 16 0 18.6"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.3a1.8 1.8 0 0 1 3.4 0l.3.9a1.8 1.8 0 0 0 2.4 1l.9-.4a1.8 1.8 0 0 1 2.4 2.4l-.4.9a1.8 1.8 0 0 0 1 2.4l.9.3a1.8 1.8 0 0 1 0 3.4l-.9.3a1.8 1.8 0 0 0-1 2.4l.4.9a1.8 1.8 0 0 1-2.4 2.4l-.9-.4a1.8 1.8 0 0 0-2.4 1l-.3.9a1.8 1.8 0 0 1-3.4 0l-.3-.9a1.8 1.8 0 0 0-2.4-1l-.9.4a1.8 1.8 0 0 1-2.4-2.4l.4-.9a1.8 1.8 0 0 0-1-2.4l-.9-.3a1.8 1.8 0 0 1 0-3.4l.9-.3a1.8 1.8 0 0 0 1-2.4l-.4-.9a1.8 1.8 0 0 1 2.4-2.4l.9.4a1.8 1.8 0 0 0 2.4-1z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.6L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.6L20 16M20 20v-4h-4"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.5H7a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-12zM14 2.5v5h5M12 11.5v6M9.2 14.8L12 17.6l2.8-2.8"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.5l8 3v6.2c0 5-3.4 8.5-8 9.8-4.6-1.3-8-4.8-8-9.8V5.5z"/><path d="M8.6 12.2l2.4 2.4 4.4-4.6"/></symbol>
+<symbol id="i-route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H16a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h7.5"/></symbol>
+<symbol id="i-radar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6.5-6.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.4h.01"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2.5"/><path d="M7 12h.01M10.5 12h.01M15 10.5v3M18 10.5v3"/></symbol>
+</defs>
+</svg>
+
+<div class="wrap" id="app" aria-live="polite"></div>
+
+<dialog class="sheet" id="sheet" closedby="any" aria-label="Details">
+  <div class="grab" aria-hidden="true"></div>
+  <button class="ib sheet-x" data-act="close" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+  <div class="sheet-sc" id="sheet-body"></div>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Ionity's Opensource VPN — app logic. One file, no framework.
+   Every rule marked [GF] is ported from Gate^Flame and must stay identical.
+   ===================================================================== */
+const APP = { name: "Ionity's Opensource VPN", short: 'Open VPN', version: '0.2.0', port: 8080, api: '/api/v1' };
+const WORDMARK = 'data:image/png;base64,__WORDMARK__';
+const POLL_MS = 20000;            // [GF] ShieldScreen polls every 20 s
+const REQ_TIMEOUT_MS = 8000;      // GF uses 4 s; /vpn/regions can be slow on a cold VPN Gate cache
+const PROBE_TIMEOUT_MS = 2500;    // [GF] nodeDiscovery: min(apiTimeout, 2500)
+
+// [GF] config/env.ts discoveryCandidates, plus the Ionity lab box.
+const CANDIDATES = [
+  'http://gateflame.local:8080', 'http://raspberrypi.local:8080', 'http://localhost:8080', 'http://127.0.0.1:8080',
+  'http://192.168.0.10:8080', 'http://192.168.1.10:8080', 'http://192.168.1.105:8080', 'http://192.168.1.100:8080',
+  'http://192.168.0.105:8080', 'http://192.168.8.105:8080', 'http://10.0.0.105:8080', 'http://gateflame.local',
+  'http://192.168.124.3:8080',
+];
+
+/* ---------- native bridge (present only inside the APK) -------------- */
+const Cap = window.Capacitor;
+const NATIVE = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+const plugin = (n) => { try { return NATIVE ? Cap.registerPlugin(n) : null; } catch { return null; } };
+const P = { App: plugin('App'), Share: plugin('Share'), Filesystem: plugin('Filesystem'), Haptics: plugin('Haptics'),
+            StatusBar: plugin('StatusBar'), Splash: plugin('SplashScreen'), LanInfo: plugin('LanInfo') };
+const haptic = (style = 'LIGHT') => { try { P.Haptics && P.Haptics.impact({ style }); } catch {} };
+
+/* ---------- storage (best effort) ------------------------------------ */
+const store = {
+  get(k) { try { return localStorage.getItem('iov.' + k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem('iov.' + k) : localStorage.setItem('iov.' + k, v); } catch {} },
+};
+
+/* ---------- state ----------------------------------------------------- */
+const S = {
+  mode: null, base: store.get('base'), token: store.get('token'), nodeId: store.get('nodeId'),
+  step: 'find', found: [], pick: null, scan: null, scanning: false,
+  regions: null, continents: null, vpnDevices: null, clients: null,
+  err: { regions: null, continents: null, vpnDevices: null, clients: null }, lastSync: null,
+  busy: null, problem: null, filter: 'all', sel: null, tab: null, q: '', config: {}, sheet: null,
+};
+if (S.base && S.token) S.mode = 'live';
+else if (store.get('demo') === '1') S.mode = 'demo';
+
+/* ---------- helpers --------------------------------------------------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ic = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const pl = (n, w, ws) => `${n} ${n === 1 ? w : (ws || w + 's')}`;
+const cc = (code) => `<span class="cc">${esc(String(code || '').toUpperCase().slice(0, 3))}</span>`;
+const wide = () => window.matchMedia('(min-width: 980px)').matches;
+function ago(t) { if (!t) return '—'; const s = Math.round((Date.now() - t) / 1000); return s < 5 ? 'just now' : s < 60 ? `${s}s ago` : `${Math.round(s / 60)}m ago`; }
+
+function deviceIcon(c) {
+  const s = `${c.label || ''} ${c.vendor || ''} ${c.hostname || ''}`.toLowerCase();
+  if (/\btv\b|roku|chromecast|bravia|lg elec|hisense|tcl|fire ?stick|android tv|shield/.test(s)) return 'tv';
+  if (/xbox|playstation|nintendo|sony interactive/.test(s)) return 'console';
+  if (/laptop|macbook|thinkpad|dell|lenovo|hewlett|\bhp\b|asus|acer|intel|desktop|surface|\bpc\b/.test(s)) return 'laptop';
+  if (/espressif|raspberry|tuya|sonoff|shelly|iot|camera|printer|ring\b/.test(s)) return 'chip';
+  return 'phone';
+}
+
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3400); }
+
+/* ---------- address handling [GF apiClient.assertPrivateHost] --------- */
+function normaliseAddress(raw) { // [GF] AppPairingScreen.tryManualAddress
+  let c = String(raw || '').trim(); if (!c) return null;
+  c = /^https?:\/\//i.test(c) ? c : `http://${c}`;
+  c = c.replace(/\/+$/, '');
+  if (!/:\d+$/.test(c.replace(/^https?:\/\//i, ''))) c = `${c}:${APP.port}`;
+  try { new URL(c); return c; } catch { return null; }
+}
+function assertPrivateHost(base) {
+  const u = new URL(base);
+  if (u.protocol === 'https:') return;
+  if (u.protocol !== 'http:') throw new ApiError(`Refusing ${u.protocol} — only http and https are supported.`, null, true);
+  const h = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || h === '::1' || h.endsWith('.local')) return;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)) return;
+  } else if (/^(fc|fd|fe80)/.test(h)) return;
+  throw new ApiError(`"${h}" is not on a private network. A pairing token is only ever sent to your home network, or over HTTPS.`, null, true);
+}
+
+/* ---------- transport [GF kioskClient.nodeRequest] -------------------- */
+class ApiError extends Error { constructor(msg, status, unreachable) { super(msg); this.status = status; this.unreachable = unreachable; } }
+
+async function api(path, { method = 'GET', body, auth = true, base = S.base, timeout = REQ_TIMEOUT_MS, signal } = {}) {
+  if (S.mode === 'demo' && auth !== 'probe') return demoApi(path, method, body);
+  assertPrivateHost(base);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeout);
+  const onAbort = () => ctrl.abort();
+  if (signal) { if (signal.aborted) ctrl.abort(); else signal.addEventListener('abort', onAbort, { once: true }); }
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  const sentToken = auth === true && S.token ? S.token : null;
+  if (sentToken) headers.Authorization = `Bearer ${sentToken}`;
+  try {
+    const res = await fetch(base + APP.api + path, { method, headers: Object.keys(headers).length ? headers : undefined, body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal });
+    if (!res.ok) {
+      // [GF] a 401 to a request that CARRIED a token = this handset was revoked.
+      if (res.status === 401 && sentToken) { revoked(); }
+      let detail = `${res.status}`;
+      try {
+        const d = (await res.json())?.detail;
+        if (typeof d === 'string') detail = d;
+        else if (d?.advisory) detail = String(d.advisory);
+        else if (d?.applied?.error) detail = String(d.applied.error);
+        else if (d?.message) detail = String(d.message);
+        else if (d?.error) detail = String(d.error);
+      } catch {}
+      throw new ApiError(detail, res.status, false);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    const aborted = e && e.name === 'AbortError';
+    throw new ApiError(aborted ? `The box did not answer within ${Math.round(timeout / 1000)} seconds.` : 'No route to the box on this network.', null, true);
+  } finally { clearTimeout(t); if (signal) signal.removeEventListener('abort', onAbort); }
+}
+
+/* ---------- polling: four independent reads [GF usePolled x4] --------- */
+const PATHS = { regions: '/vpn/regions', continents: '/vpn/continents', vpnDevices: '/vpn/devices', clients: '/clients' };
+let inflight = false;
+async function refresh(which = Object.keys(PATHS)) {
+  if (!S.mode || inflight) return;
+  inflight = true;
+  // Independent: a slow region list must never blank the device list. [GF]
+  await Promise.all(which.map(async (k) => {
+    try { S[k] = await api(PATHS[k]); S.err[k] = null; }
+    catch (e) { S.err[k] = e; } // keep the last good payload, publish the error too
+  }));
+  if (which.some((k) => !S.err[k])) S.lastSync = Date.now();
+  inflight = false;
+  render();
+}
+let pollT;
+function startPolling() { clearInterval(pollT); pollT = setInterval(() => { if (document.visibilityState === 'visible' && S.mode) refresh(); }, POLL_MS); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.mode) refresh(); });
+setInterval(() => { const el = $('#synced'); if (el) el.textContent = ago(S.lastSync); }, 5000);
+
+/* ---------- rows: [GF] ShieldScreen merge, exactly --------------------- */
+function detailFor(c) { const b = []; if (c.vendor) b.push(c.vendor); else if (c.randomisedMac) b.push('private address'); b.push(c.mac); return b.join(' · '); }
+function rows() {
+  const lan = S.clients?.clients ?? [];
+  const known = S.vpnDevices?.devices ?? [];
+  const byMac = new Map(known.map((d) => [d.mac, d]));
+  return [
+    ...lan.map((c) => ({ mac: c.mac, label: c.label || c.hostname || c.mac, detail: detailFor(c), ownerName: c.ownerName ?? null, icon: deviceIcon(c), online: true,
+      region: byMac.get(c.mac)?.region ?? null, enabled: byMac.get(c.mac)?.enabled ?? false,
+      peerRegistered: byMac.get(c.mac)?.peerRegistered ?? false, provider: byMac.get(c.mac)?.provider ?? 'headscale' })),
+    ...known.filter((d) => !lan.some((c) => c.mac === d.mac)).map((d) => ({ mac: d.mac, label: d.mac, detail: 'not on the network right now', ownerName: null, icon: 'phone', online: false,
+      region: d.region, enabled: d.enabled, peerRegistered: d.peerRegistered, provider: d.provider ?? 'headscale' })),
+  ];
+}
+const regionList = () => S.regions?.regions ?? [];
+function regionLabel(code, provider) { const r = regionList().find((x) => x.code === code && (!provider || x.provider === provider)); return r ? r.label : (code || ''); }
+
+/* ---------- writes ------------------------------------------------------ */
+async function setDevice(mac, region, enabled, provider) {
+  S.busy = 'dev-' + mac; S.problem = null; delete S.config[mac]; render();
+  try {
+    const r = await api(`/vpn/devices/${encodeURIComponent(mac)}`, { method: 'PUT', body: { region, enabled, provider } });
+    if (r && r.lastError) { S.problem = r.lastError; haptic('HEAVY'); }
+    else toast(enabled ? (region ? `${regionLabel(region, provider)} set for this device` : 'Switched on') : 'Switched off — normal internet');
+    await refresh(['vpnDevices']);
+  } catch (e) { S.problem = e.message; }
+  finally { S.busy = null; render(); }
+}
+function toggle(mac) { // [GF] ShieldScreen toggle: fall back to the first offered region
+  const row = rows().find((x) => x.mac === mac); if (!row) return;
+  haptic();
+  const fallback = regionList()[0];
+  const region = row.region ?? fallback?.code ?? null;
+  const provider = row.region ? row.provider : (fallback?.provider ?? 'headscale');
+  setDevice(mac, region, !row.enabled, provider);
+}
+async function saveName(mac, name) {
+  S.busy = 'name-' + mac; S.problem = null; render();
+  try { await api(`/clients/${encodeURIComponent(mac)}/name`, { method: 'PUT', body: { name } }); toast(name ? 'Name saved' : 'Name cleared'); await refresh(['clients']); }
+  catch (e) { S.problem = e.message; }
+  finally { S.busy = null; render(); }
+}
+async function handOff(filename, text) { // [GF] handOffConfigFile
+  if (NATIVE && P.Filesystem && P.Share) {
+    try {
+      const w = await P.Filesystem.writeFile({ path: filename, data: text, directory: 'CACHE', encoding: 'utf8' });
+      await P.Share.share({ title: 'Ionity VPN connection file', text: 'Open with your OpenVPN app to connect.', url: w.uri, dialogTitle: 'Open with…' });
+      return 'shared';
+    } catch {}
+  }
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/x-openvpn-profile' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+  return 'downloaded';
+}
+async function getConfig(mac) {
+  S.busy = 'cfg-' + mac; render();
+  try {
+    const r = await api(`/vpn/devices/${encodeURIComponent(mac)}/vpngate-config`); // fresh every time: VPN Gate rotates
+    let how = null;
+    if (r.available && r.configText) how = await handOff(`ionity-vpn-${String(r.countryCode || 'region').toLowerCase()}.ovpn`, r.configText);
+    S.config[mac] = { r, how };
+  } catch (e) { S.config[mac] = { r: { available: false, error: e.message } }; }
+  finally { S.busy = null; render(); }
+}
+
+function revoked() { forget(); toast('This box no longer recognises this device. Pair again.'); }
+function forget() {
+  Object.assign(S, { mode: null, token: null, base: null, nodeId: null, step: 'find', found: [], pick: null, sel: null, problem: null,
+    regions: null, continents: null, vpnDevices: null, clients: null, lastSync: null });
+  ['token', 'base', 'nodeId', 'demo'].forEach((k) => store.set(k, null));
+  clearInterval(pollT); closeSheet(); render();
+}
+
+/* ---------- discovery [GF nodeDiscovery] + native subnet scan ---------- */
+async function probe(base, signal) {
+  const s = await api('/system/status', { base, auth: 'probe', timeout: PROBE_TIMEOUT_MS, signal });
+  if (!s || typeof s.nodeId !== 'string' || typeof s.agentVersion !== 'string') throw new ApiError(`${base} answered, but is not a Gate^Flame box.`, null, true);
+  return { base, nodeId: s.nodeId, agent: s.agentVersion, provisioned: !!s.provisioned };
+}
+function addFound(hit) { if (!S.found.some((f) => f.nodeId === hit.nodeId)) S.found.push(hit); }
+let scanCtrl = null;
+
+async function lanPrefixes() {
+  const out = [];
+  if (P.LanInfo) {
+    try {
+      const r = await P.LanInfo.get();
+      for (const a of r.addresses || []) {
+        const m = /^(\d+\.\d+\.\d+)\.\d+$/.exec(a.address || '');
+        if (m && !out.includes(m[1]) && !/^127\./.test(a.address) && !/^100\./.test(a.address)) out.push(m[1]);
+      }
+    } catch {}
+  }
+  return out;
+}
+async function sweep(prefix, signal) {
+  const hosts = Array.from({ length: 254 }, (_, i) => `http://${prefix}.${i + 1}:${APP.port}`);
+  let done = 0; S.scan = { prefix, done, total: hosts.length }; render();
+  const worker = async () => {
+    while (hosts.length && !signal.aborted) {
+      const h = hosts.shift();
+      try { addFound(await probe(h, signal)); } catch {}
+      done++; if (done % 6 === 0 || !hosts.length) { S.scan = { prefix, done, total: 254 }; renderProgress(); }
+    }
+  };
+  await Promise.all(Array.from({ length: 40 }, worker));
+}
+async function discover(extraPrefix) {
+  if (scanCtrl) scanCtrl.abort();
+  const ctrl = scanCtrl = new AbortController();
+  S.scanning = true; S.problem = null; S.found = []; S.scan = null; S.log = []; render();
+  const log = (k, txt, state) => { const i = S.log.findIndex((x) => x.k === k); const e = { k, txt, state }; i < 0 ? S.log.push(e) : (S.log[i] = e); renderProgress(); };
+  try {
+    // 1. Where we found it last time. [GF]
+    const last = store.get('lastNode');
+    if (last && !extraPrefix) {
+      log('last', `Last known · ${new URL(last).host}`, 'run');
+      try { addFound(await probe(last, ctrl.signal)); log('last', `Last known · ${new URL(last).host}`, 'ok'); } catch { log('last', `Last known · ${new URL(last).host}`, 'no'); }
+    }
+    // 2. Race the well-known candidates. [GF]
+    if (!S.found.length && !extraPrefix) {
+      log('cand', `Known addresses · ${CANDIDATES.length}`, 'run');
+      const hits = await Promise.allSettled(CANDIDATES.map((c) => probe(c, ctrl.signal)));
+      hits.forEach((h) => h.status === 'fulfilled' && addFound(h.value));
+      log('cand', `Known addresses · ${CANDIDATES.length}`, S.found.length ? 'ok' : 'no');
+    }
+    // 3. Sweep this phone's own subnet(s) — APK only (the browser cannot see its own address).
+    if (!S.found.length || extraPrefix) {
+      const prefixes = extraPrefix ? [extraPrefix] : await lanPrefixes();
+      for (const p of prefixes) {
+        if (ctrl.signal.aborted) break;
+        log('sweep-' + p, `Scanning ${p}.0/24`, 'run');
+        await sweep(p, ctrl.signal);
+        log('sweep-' + p, `Scanning ${p}.0/24`, S.found.length ? 'ok' : 'no');
+      }
+    }
+  } finally {
+    if (scanCtrl === ctrl) { S.scanning = false; S.scan = null; scanCtrl = null; }
+  }
+  if (S.found.length === 1) { choose(0); return; }
+  if (!S.found.length) S.problem = NATIVE
+    ? 'No Gate^Flame box answered on this network. Check the box is on, and that this phone is on the same network (not mobile data).'
+    : 'No Gate^Flame box answered. Type its address (shown on the box screen), or scan your network range.';
+  render();
+}
+async function useAddress(raw) {
+  const base = normaliseAddress(raw);
+  if (!base) { S.problem = 'That does not look like an address.'; return render(); }
+  S.scanning = true; S.problem = null; render();
+  try { const hit = await probe(base); S.found = [hit]; store.set('lastAddr', raw); choose(0); }
+  catch { S.problem = `Nothing that looks like a Gate^Flame box answered at ${base}.`; } // [GF] wording
+  S.scanning = false; render();
+}
+function choose(i) { S.pick = S.found[i]; S.step = 'code'; render(); setTimeout(() => $('#code')?.focus(), 60); }
+
+/* ---------- pairing [GF gateflameApi.claimPairingCode] ----------------- */
+function defaultDeviceName() { // [GF] mobile/deviceName.ts
+  const ua = (navigator.userAgent || '').trim();
+  const a = /Android\s[^;)]*;\s*([^;)]+?)(?:\s+Build\/[^;)]*)?\s*[;)]/i.exec(ua);
+  if (a) { const m = a[1].trim(); if (m && m.toUpperCase() !== 'K' && !/^wv$/i.test(m)) return m.slice(0, 48); }
+  if (/\biPhone\b/.test(ua)) return 'iPhone';
+  if (/\biPad\b/.test(ua)) return 'iPad';
+  return 'My phone';
+}
+let refinedName = null;
+(async () => { try { const u = navigator.userAgentData; if (u?.getHighEntropyValues) { const { model } = await u.getHighEntropyValues(['model']); if (model && model.trim().toUpperCase() !== 'K') { refinedName = model.trim().slice(0, 48); const f = $('#devname'); if (f && f.dataset.touched !== '1') f.value = refinedName; } } } catch {} })();
+
+async function claim(code, name) {
+  S.busy = 'claim'; S.problem = null; render();
+  try {
+    const r = await api('/pair/claim', { method: 'POST', base: S.pick.base, auth: false, body: { code: code.trim(), deviceName: (name || defaultDeviceName()).slice(0, 64) } });
+    Object.assign(S, { token: r.deviceToken, base: S.pick.base, nodeId: r.nodeId || S.pick.nodeId, mode: 'live' });
+    store.set('token', S.token); store.set('base', S.base); store.set('nodeId', S.nodeId); store.set('lastNode', S.base); store.set('demo', null);
+    haptic('MEDIUM'); toast(`Paired with ${S.nodeId}`); startPolling(); refresh();
+  } catch (e) {
+    S.problem = e.status === 401 ? 'That code was not accepted. Check the box screen and try again.'
+      : e.status === 410 ? 'That code expired. Ask the box for a new one.'
+      : e.status === 429 ? 'Too many tries from this device. Wait a minute, then try again.'
+      : e.message;
+  }
+  S.busy = null; render();
+}
+
+/* ======================= VIEWS ======================================== */
+const steps = (n) => ['Find', 'Pair', 'Choose'].map((t, i) => `<div class="${i < n ? 'done' : i === n ? 'on' : ''}">0${i + 1} // ${t}</div>`).join('');
+
+function vOnboard() {
+  const codeStep = S.step === 'code' && S.pick;
+  const busy = S.scanning;
+  return `<div class="ob">
+    <img class="wm" src="${WORDMARK}" alt="Ionity">
+    <div class="eyebrow"><span class="grad-t">●</span> Open VPN // Per-device regions</div>
+    <h1>Every device.<br><span class="grad-t">Its own country.</span></h1>
+    <p class="lead">Give each phone, laptop and TV at home its own VPN region — chosen here, served by your Gate^Flame box.</p>
+    <div class="card">
+      <div class="steps">${steps(codeStep ? 1 : 0)}</div>
+      <div class="card-b">
+      ${S.problem ? `<div class="note bad">${ic('alert')}<div>${esc(S.problem)}</div></div>` : ''}
+      ${!codeStep ? `
+        <button class="btn pri" data-act="discover" ${busy ? 'disabled' : ''}>${ic('radar')} ${busy ? 'Looking for your box…' : 'Find my box'}</button>
+        <div id="prog">${vProgress()}</div>
+        <div class="or">or</div>
+        <form data-form="address">
+          <label class="fld"><span>Box address</span>
+            <div class="row2"><input class="in" name="address" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.1.20" value="${esc(store.get('lastAddr') || '')}">
+            <button class="btn" style="width:auto" ${busy ? 'disabled' : ''}>Connect</button></div></label>
+        </form>
+        <form data-form="scan">
+          <label class="fld" style="margin:0"><span>Or scan a network range</span>
+            <div class="row2"><input class="in mono" name="prefix" inputmode="decimal" autocomplete="off" placeholder="192.168.124" value="${esc(store.get('lastPrefix') || '')}">
+            <button class="btn" style="width:auto" ${busy ? 'disabled' : ''}>${ic('radar')} Scan</button></div></label>
+          <p class="hint">Port 8080 is assumed. Your ${NATIVE ? 'phone' : 'device'} must be on the same network as the box — the address is on the box's screen.</p>
+        </form>` : `
+        <div class="found" style="margin:0 0 18px">${ic('box')}<div class="t"><b>${esc(S.pick.nodeId)}</b><small>${esc(new URL(S.pick.base).host)} · agent ${esc(S.pick.agent)}</small></div><span class="dot ok"></span></div>
+        <form data-form="claim">
+          <label class="fld"><span>Pairing code — shown on the box</span>
+            <input id="code" class="in code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="000000"></label>
+          <label class="fld"><span>Name this device</span>
+            <input id="devname" class="in" name="name" maxlength="64" value="${esc(refinedName || defaultDeviceName())}" oninput="this.dataset.touched='1'"></label>
+          <button class="btn pri" ${S.busy === 'claim' ? 'disabled' : ''}>${ic('shield')} ${S.busy === 'claim' ? 'Pairing…' : 'Pair with this box'}</button>
+          <button type="button" class="btn ghost" data-act="back" style="margin-top:8px">Use a different box</button>
+        </form>`}
+      </div>
+    </div>
+    <div class="feats">
+      <div>${ic('route')}<b>Per device</b>Each device picks its own region.</div>
+      <div>${ic('globe')}<b>By continent</b>Or one exact country.</div>
+      <div>${ic('shield')}<b>Off the path</b>Your box never carries the tunnel.</div>
+    </div>
+    <button class="btn ghost" data-act="demo" style="margin-top:14px">Explore with sample data</button>
+    ${vFoot()}
+  </div>`;
+}
+function vProgress() {
+  const L = S.log || [];
+  if (!L.length && !S.found.length) return '';
+  const st = { run: '<span class="dot warn pulse"></span>', ok: '<span class="dot ok"></span>', no: '<span class="dot"></span>' };
+  let h = '<div class="prog">' + L.map((x) => `<div>${st[x.state]}<span>${esc(x.txt)}</span>${x.state === 'run' && S.scan && x.k === 'sweep-' + S.scan.prefix ? `<span class="m">${S.scan.done}/${S.scan.total}</span>` : `<span class="m">${x.state === 'ok' ? 'found' : x.state === 'no' ? '—' : '…'}</span>`}</div>`).join('');
+  if (S.scan) h += `<div style="display:block;padding:0 0 10px;border:0"><i style="width:${Math.round(S.scan.done / S.scan.total * 100)}%"></i></div>`;
+  h += '</div>';
+  if (S.found.length > 1) h += S.found.map((f, i) => `<button class="found" data-act="choose" data-i="${i}">${ic('box')}<div class="t"><b>${esc(f.nodeId)}</b><small>${esc(new URL(f.base).host)}</small></div></button>`).join('');
+  return h;
+}
+function renderProgress() { const el = $('#prog'); if (el) el.innerHTML = vProgress(); }
+
+function vFoot() {
+  return `<footer class="foot"><img class="wm" src="${WORDMARK}" alt="Ionity"><span>${esc(APP.name)} v${APP.version}</span><span>CC BY-NC-SA 4.0 · Policy 986 AED</span>
+    <span class="r">© 2018–2026 Antwerp Designs | Ionity (Pty) Ltd · <a href="https://www.ionity.today" target="_blank" rel="noopener">ionity.today</a> · Building Tomorrow, Today.</span></footer>`;
+}
+
+function vMain() {
+  const r = S.regions, all = rows(), on = all.filter((x) => x.enabled), shown = S.filter === 'on' ? on : all;
+  const total = all.length, pct = total ? on.length / total : 0, C = 2 * Math.PI * 46;
+  const ion = regionList().filter((x) => x.provider === 'headscale'), com = regionList().filter((x) => x.provider === 'vpngate');
+  const stale = Object.values(S.err).some(Boolean) && (S.clients || S.vpnDevices);
+  const label = r?.label || 'Shield';
+
+  let ionV, comV;
+  if (S.err.regions && !r) ionV = comV = '<span class="dot bad"></span><small>no answer</small>';
+  else if (!r) ionV = comV = '<span class="dot pulse"></span><small>reading</small>';
+  else {
+    ionV = r.controlPlaneReachable ? `<span class="dot ok"></span>${ion.length}` : `<span class="dot"></span><small>not set up</small>`;
+    comV = r.refreshing && !com.length ? `<span class="dot warn pulse"></span><small>fetching</small>` : r.vpnGateAvailable ? `<span class="dot ok"></span>${com.length}<small class="wide-only">countries</small>` : `<span class="dot bad"></span><small>unreachable</small>`;
+  }
+
+  return `
+  <header class="bar">
+    <img class="wm" src="${WORDMARK}" alt="Ionity"><span class="vr"></span><span class="prod">${esc(APP.short)}</span>
+    <span class="sp"></span>
+    <span class="pill"><span class="dot ${S.mode === 'demo' ? 'warn' : stale ? 'bad' : 'ok'}"></span>${S.mode === 'demo' ? 'DEMO' : esc(S.nodeId || 'box')}</span>
+    <button class="ib" data-act="refresh" aria-label="Refresh">${ic('sync')}</button>
+    <button class="ib" data-act="settings" aria-label="Settings">${ic('gear')}</button>
+  </header>
+  <div class="grid2">
+    <div>
+      ${S.mode === 'demo' ? `<div class="note warn">${ic('info')}<div><b>Demo — sample data.</b> Nothing here is your network. Pair a Gate^Flame box to control real devices.</div><button class="x" data-act="leave-demo">Pair a box</button></div>` : ''}
+      ${S.problem ? `<div class="note bad">${ic('alert')}<div>${esc(S.problem)}</div><button class="x" data-act="dismiss">Dismiss</button></div>` : ''}
+      ${stale && S.mode === 'live' ? `<div class="note">${ic('info')}<div>The box is not answering every request right now. Showing what it last reported — retrying every 20 seconds.</div></div>` : ''}
+
+      <section class="hero">
+        <svg class="globe" viewBox="0 0 300 300" aria-hidden="true"><g fill="none" stroke="url(#ig)" stroke-width=".8">
+          <circle cx="150" cy="150" r="120"/><ellipse cx="150" cy="150" rx="40" ry="120"/><ellipse cx="150" cy="150" rx="80" ry="120"/><ellipse cx="150" cy="150" rx="110" ry="120"/>
+          <path d="M30 150h240M45 90h210M45 210h210M80 45h140M80 255h140"/></g></svg>
+        <div class="hero-in">
+          <div>
+            <div class="eyebrow"><span class="dot ${on.length ? 'ok' : ''}"></span>${esc(label)} // status</div>
+            <div class="big"><span class="grad-t">${on.length}</span><small>/ ${total}</small></div>
+            <p class="lead">${on.length ? `${pl(on.length, 'device')} routed through a region.` : 'No device is routed through a region yet.'} Tap a device to choose.</p>
+          </div>
+          <svg class="ring" viewBox="0 0 112 112" aria-hidden="true">
+            <circle cx="56" cy="56" r="46" fill="none" stroke="var(--line2)" stroke-width="2"/>
+            <circle cx="56" cy="56" r="46" fill="none" stroke="url(#ig)" stroke-width="6" stroke-linecap="round" class="arc" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}" transform="rotate(-90 56 56)"/>
+            <circle cx="56" cy="56" r="34" fill="none" stroke="var(--line)" stroke-dasharray="1 5"/>
+            <text x="56" y="61" text-anchor="middle" fill="var(--tx)" style="font:600 15px var(--mono)">${Math.round(pct * 100)}%</text>
+          </svg>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Ionity regions</div><div class="v">${ionV}</div></div>
+          <div class="stat"><div class="k">Community</div><div class="v">${comV}</div></div>
+          <div class="stat"><div class="k">Synced</div><div class="v"><small id="synced">${ago(S.lastSync)}</small></div></div>
+        </div>
+        <div class="hero-f"><span class="tag">${ic('info').replace('<svg', '<svg style="width:11px;height:11px;margin-right:4px"')}Two kinds of region</span><button class="link" data-act="about">What's the difference?</button></div>
+      </section>
+
+      <div class="sh"><span class="n grad-t">01</span><h2>Devices</h2><span class="rule"></span>
+        <div class="seg" role="group" aria-label="Filter"><button data-act="filter" data-v="all" aria-pressed="${S.filter === 'all'}">All ${total}</button><button data-act="filter" data-v="on" aria-pressed="${S.filter === 'on'}">On ${on.length}</button></div></div>
+      <div class="panel">${vDevices(shown)}</div>
+
+      ${vContinents()}
+
+      <div class="sh"><span class="n grad-t">03</span><h2>How it works</h2><span class="rule"></span></div>
+      <div class="how">
+        <div><span class="n grad-t">A</span><b>You choose</b><p>Pick a region per device here. The box stores each choice.</p></div>
+        <div><span class="n grad-t">B</span><b>The device connects</b><p>It gets a connection file and tunnels straight to the exit server.</p></div>
+        <div><span class="n grad-t">C</span><b>Your box stays clear</b><p>No tunnelled traffic ever passes through the Gate^Flame box.</p></div>
+      </div>
+    </div>
+    <aside class="side" id="side">${wide() ? `<div class="panel">${S.sel ? vChooser(S.sel) : vPick()}</div>` : ''}</aside>
+  </div>
+  ${vFoot()}`;
+}
+
+function vDevices(list) {
+  if (!S.clients && !S.vpnDevices) {
+    if (S.err.clients && S.err.vpnDevices) return `<div class="empty">Could not ask the box just now. Trying again every 20 seconds.</div>`;
+    return '<div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div>';
+  }
+  if (!list.length) return `<div class="empty">${S.filter === 'on' ? 'No device has a region switched on yet.' : S.clients ? 'No devices seen on your network yet.' : 'Reading your devices…'}</div>`;
+  return list.map((d) => {
+    const busy = S.busy === 'dev-' + d.mac;
+    const sub = d.enabled && d.region
+      ? `${cc(d.region)}<span class="r">${esc(regionLabel(d.region, d.provider))}</span>${d.provider === 'vpngate' ? '<span class="tag">community</span>' : `<span class="tag v">${d.peerRegistered ? 'key issued' : 'Ionity'}</span>`}`
+      : d.enabled ? `<span class="r">On</span><span class="m">· no region offered yet</span>` : `<span class="m">${esc(d.detail)}</span>`;
+    return `<div class="dev ${d.enabled ? 'on' : ''} ${S.sel === d.mac && wide() ? 'sel' : ''}">
+      <button class="tap" data-act="open" data-mac="${esc(d.mac)}" aria-label="Choose region for ${esc(d.label)}">
+        <span class="tile">${ic(d.icon)}</span>
+        <span class="meta"><span class="nm" style="display:block">${esc(d.label)}</span><span class="sub">${sub}</span></span>
+      </button>
+      <button class="sw ${busy ? 'busy' : ''}" role="switch" aria-checked="${d.enabled}" aria-label="Region for ${esc(d.label)}" data-act="toggle" data-mac="${esc(d.mac)}" ${S.busy ? 'disabled' : ''}></button>
+    </div>`;
+  }).join('');
+}
+
+function vContinents() {
+  const cs = S.continents?.continents ?? [];
+  if (!cs.length) return '';
+  const max = Math.max(...cs.map((c) => c.serverCount), 1);
+  return `<div class="sh"><span class="n grad-t">02</span><h2>Community coverage</h2><span class="rule"></span><span class="tag">VPN Gate</span></div>
+    <div class="panel">${cs.map((c) => `<div class="ct"><div class="l">${esc(c.label)}<small>Best now · ${esc(c.bestCountryLabel)}</small></div><span></span>
+      <span class="c">${pl(c.countryCount, 'country', 'countries')} · ${pl(c.serverCount, 'server')}</span>
+      <div class="bar-t"><i style="width:${Math.max(4, Math.round(c.serverCount / max * 100))}%"></i></div></div>`).join('')}</div>`;
+}
+
+/* ---------- chooser: [GF] ShieldScreen expanded row, as a panel -------- */
+function vChooser(mac) {
+  const d = rows().find((x) => x.mac === mac);
+  if (!d) return `<div class="empty">That device is no longer listed.</div>`;
+  const regions = regionList(), ion = regions.filter((r) => r.provider === 'headscale'), com = regions.filter((r) => r.provider === 'vpngate');
+  const cons = S.continents?.continents ?? [];
+  const dis = S.busy ? 'disabled' : '';
+  const act = (code, prov) => d.enabled && d.region === code && d.provider === prov;
+  const tabs = [ion.length && ['ionity', `Ionity ${ion.length}`], cons.length && ['continent', 'Continent'], com.length && ['country', `Country ${com.length}`]].filter(Boolean);
+  let tab = S.tab && tabs.some((t) => t[0] === S.tab) ? S.tab : (tabs[0] && tabs[0][0]);
+  if (!S.tab && d.enabled && d.provider === 'vpngate' && tabs.some((t) => t[0] === 'continent')) tab = cons.some((c) => c.bestCountryCode === d.region) ? 'continent' : 'country';
+
+  // Four states kept apart [GF]: could not ask / loading / fetching / empty.
+  let body = '';
+  if (S.err.regions && !S.regions) body = `<div class="empty">Could not ask the box just now. Trying again every 20 seconds.</div>`;
+  else if (!S.regions) body = `<div class="sk" style="border-radius:16px"></div>`;
+  else if (!regions.length) body = S.regions.refreshing
+    ? `<div class="empty"><span class="dot warn pulse"></span>&nbsp; The box is fetching the region list now…</div>`
+    : `<div class="empty">${!S.regions.controlPlaneReachable && !S.regions.vpnGateAvailable ? 'No Shield provider is switched on for this box.' : 'The region list came back empty. Nothing to pick yet.'}</div>`;
+  else {
+    body += tabs.length > 1 ? `<div class="seg full" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-act="tab" data-v="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div><div style="height:12px"></div>` : '';
+    if (tab === 'ionity') body += `<div class="opts">${ion.map((r) => `<button class="opt" data-act="pick" data-code="${esc(r.code)}" data-prov="headscale" aria-pressed="${act(r.code, 'headscale')}" ${dis} ${r.available ? '' : 'disabled'}>
+        ${cc(r.code)}<b>${esc(r.label)}</b><small>${r.available ? 'Ionity-run · online' : 'Offline right now'}</small></button>`).join('')}</div>`;
+    if (tab === 'continent') body += `<div class="opts">${cons.map((c) => `<button class="opt" data-act="pick" data-code="${esc(c.bestCountryCode)}" data-prov="vpngate" aria-pressed="${act(c.bestCountryCode, 'vpngate')}" ${dis} ${c.available ? '' : 'disabled'}>
+        <svg class="gl"><use href="#i-globe"/></svg><b>${esc(c.label)}</b><small>Best now: ${esc(c.bestCountryLabel)}<br>${pl(c.countryCount, 'country', 'countries')} · ${pl(c.serverCount, 'server')}</small></button>`).join('')}</div>`;
+    if (tab === 'country') {
+      const q = S.q.trim().toLowerCase();
+      const list = com.filter((r) => !q || r.label.toLowerCase().includes(q) || r.code.toLowerCase().includes(q));
+      body += `<input class="search" type="search" placeholder="Search ${com.length} countries" value="${esc(S.q)}" data-input="q" aria-label="Search countries">
+        <div class="list">${list.map((r) => `<button class="li" data-act="pick" data-code="${esc(r.code)}" data-prov="vpngate" aria-pressed="${act(r.code, 'vpngate')}" ${dis} ${r.available ? '' : 'disabled'}>
+          ${cc(r.code)}<span class="t"><b>${esc(r.label)}</b><small>${r.serverCount != null ? pl(r.serverCount, 'server') : ''}${r.available ? '' : ' · offline'}</small></span><svg class="ck"><use href="#i-check"/></svg></button>`).join('') || '<div class="empty">No country matches.</div>'}</div>`;
+    }
+  }
+
+  const cfg = S.config[d.mac];
+  const connect = d.enabled && d.region && d.provider === 'vpngate' ? `
+    <div class="ch-sec">Connect this device <span class="tag">community</span></div>
+    <button class="btn pri" data-act="config" data-mac="${esc(d.mac)}" ${dis}>${ic('file')} ${S.busy === 'cfg-' + d.mac ? 'Fetching the best server…' : 'Get connection file'}</button>
+    <p class="hint">Opens in the OpenVPN app on <b>${esc(d.label)}</b>. Fetched fresh each time — community servers rotate.</p>
+    ${cfg ? (cfg.r.available ? `<div class="res">${cfg.how === 'shared' ? 'Pick your OpenVPN app from the share sheet to connect.' : 'Saved. Open it with the OpenVPN app on that device.'}</div>
+      <dl class="spec"><dt>Server</dt><dd>${esc(cfg.r.hostname || '—')}</dd><dt>Country</dt><dd>${esc(cfg.r.countryName || cfg.r.countryCode || '')}</dd>
+      ${cfg.r.ip ? `<dt>IP</dt><dd>${esc(cfg.r.ip)}</dd>` : ''}${cfg.r.pingMs != null ? `<dt>Ping</dt><dd>${Math.round(cfg.r.pingMs)} ms</dd>` : ''}${cfg.r.speedMbps != null ? `<dt>Speed</dt><dd>${cfg.r.speedMbps.toFixed(1)} Mbit/s</dd>` : ''}</dl>`
+      : `<div class="note bad" style="margin:12px 0 0">${ic('alert')}<div>${esc(cfg.r.error || "That server isn't available right now.")}</div></div>`) : ''}`
+    : d.enabled && d.region && d.provider === 'headscale' ? `<div class="ch-sec">Connect this device <span class="tag v">Ionity</span></div>
+      <p class="hint" style="margin-top:0">${d.peerRegistered ? 'The box has issued this device a sign-in key for the Ionity region.' : 'Waiting for the box to issue a sign-in key.'}</p>` : '';
+
+  return `<div class="ch-h"><span class="tile" style="${d.enabled ? '' : ''}">${ic(d.icon)}</span><div style="min-width:0;flex:1"><h3>${esc(d.label)}</h3><p>${esc(d.detail)}</p></div>
+      ${wide() ? `<button class="ib" data-act="close" aria-label="Close">${ic('x')}</button>` : ''}</div>
+    <div class="ch-b">
+      <div class="state ${d.enabled ? 'on' : ''}"><div class="t"><b>Route through a region</b><span>${d.enabled && d.region ? `${cc(d.region)} ${esc(regionLabel(d.region, d.provider))}` : d.enabled ? 'On' : 'Off — normal internet'}</span></div>
+        <button class="sw ${S.busy === 'dev-' + d.mac ? 'busy' : ''}" role="switch" aria-checked="${d.enabled}" data-act="toggle" data-mac="${esc(d.mac)}" ${dis} aria-label="Route through a region"></button></div>
+      ${d.enabled ? `<div class="ch-sec">Region</div>${body}` : `<p class="hint">Switch on to choose a region. ${regionList().length ? `It starts on ${esc(regionList()[0].label)} — change it here any time.` : ''}</p>`}
+      ${connect}
+      <div class="ch-sec">Name</div>
+      <form class="row2" data-form="rename" data-mac="${esc(d.mac)}">
+        <input class="in" name="name" maxlength="48" placeholder="e.g. Kyle's tablet" value="${esc(d.ownerName || '')}">
+        <button class="btn" ${dis}>${S.busy === 'name-' + d.mac ? '…' : 'Save'}</button>
+      </form>
+      <p class="hint">Seeded with the name you chose, never a vendor guess.</p>
+    </div>`;
+}
+
+function vPick() {
+  return `<div class="empty" style="padding:56px 28px"><svg style="width:38px;height:38px;color:var(--teal)"><use href="#i-route"/></svg>
+    <p style="font:600 18px var(--display);color:var(--tx);margin:14px 0 6px">Choose a device</p>
+    <p style="margin:0">Select a device on the left to set its region, get its connection file, or rename it.</p></div>`;
+}
+function vSettings() {
+  const th = document.documentElement.dataset.theme || 'auto';
+  return `<div class="ch-h"><span class="tile">${ic('gear')}</span><div style="flex:1;min-width:0"><h3>Settings</h3><p>${S.mode === 'demo' ? 'Demo mode' : esc(`${S.nodeId || ''} · ${S.base || ''}`)}</p></div></div>
+  <div class="ch-b">
+    <div class="ch-sec">Appearance</div>
+    <div class="seg full">${['auto', 'dark', 'light'].map((v) => `<button data-act="theme" data-v="${v}" aria-pressed="${th === v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div>
+    <div class="ch-sec">Box</div>
+    ${S.mode === 'demo' ? `<button class="btn pri" data-act="leave-demo">Leave demo and pair a box</button>`
+      : `<dl class="spec" style="margin-top:0"><dt>Node</dt><dd>${esc(S.nodeId || '—')}</dd><dt>Address</dt><dd>${esc(S.base || '—')}</dd><dt>Synced</dt><dd>${ago(S.lastSync)}</dd></dl>
+         <div style="height:12px"></div><button class="btn danger" data-act="forget">Forget this box on this device</button>
+         <p class="hint">Removes the pairing from this app only. To revoke it on the box, remove this device from the box's paired-devices list.</p>`}
+    <div class="ch-sec">About</div>
+    <div class="prose"><p><b>${esc(APP.name)}</b> v${APP.version}${NATIVE ? ' · Android' : ' · Web'}. Source-available under CC BY-NC-SA 4.0 — share and adapt for non-commercial use, with credit.</p>
+    <p class="muted">Built on Gate^Flame Shield. © 2018–2026 Antwerp Designs | Ionity (Pty) Ltd — TM2 · Policy 986 AED · www.ionity.today<br>Building Tomorrow, Today.</p></div>
+  </div>`;
+}
+function vAbout() {
+  return `<div class="ch-h"><span class="tile">${ic('globe')}</span><div style="flex:1"><h3>Two kinds of region</h3><p>What you are choosing between</p></div></div>
+  <div class="ch-b prose">
+    <p><span class="tag v">Ionity</span>&nbsp; <b>Ionity regions</b> are exit servers Ionity operates. They appear once Ionity has a server in that country.</p>
+    <p><span class="tag">community</span>&nbsp; <b>Community regions</b> come from the public VPN Gate relay network — a free academic project of the University of Tsukuba, with volunteer servers in many countries.</p>
+    <p>Community regions are useful for reaching a site that only works in one country. They are <b>best-effort, not a privacy guarantee</b>: VPN Gate states that it logs connection details (times, addresses, traffic volume) for abuse prevention, and published research describes a man-in-the-middle risk on its volunteer servers. Don't use them for banking or anything sensitive.</p>
+    <p class="muted">Either way your Gate^Flame box never carries the tunnel. It records each device's choice and hands that device a connection file; the device connects straight to the server.</p>
+  </div>`;
+}
+
+/* ---------- sheet / side panel ---------------------------------------- */
+function openDevice(mac) { S.sel = mac; S.tab = null; S.q = ''; if (wide()) { closeSheet(); render(); } else openSheet('device'); }
+function openSheet(kind) { S.sheet = kind; renderSheet(); const d = $('#sheet'); if (!d.open) { d.showModal(); $('#sheet .sheet-sc').scrollTop = 0; } }
+function closeSheet() { S.sheet = null; const d = $('#sheet'); if (d.open) d.close(); }
+function closeAny() { if ($('#sheet').open) closeSheet(); else if (S.sel) { S.sel = null; render(); } }
+$('#sheet').addEventListener('close', () => { S.sheet = null; });
+if (!('closedBy' in HTMLDialogElement.prototype)) { // light-dismiss fallback
+  $('#sheet').addEventListener('click', (e) => { const d = e.currentTarget; if (e.target !== d) return; const r = d.getBoundingClientRect();
+    if (e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right) d.close(); });
+}
+function renderSheet() {
+  if (!S.sheet) return;
+  const b = $('#sheet-body');
+  b.innerHTML = S.sheet === 'device' ? vChooser(S.sel) : S.sheet === 'settings' ? vSettings() : vAbout();
+}
+
+/* ---------- render ----------------------------------------------------- */
+function render() {
+  const a = document.activeElement, keep = a && a.dataset && a.dataset.input ? { k: a.dataset.input, p: a.selectionStart } : null;
+  $('#app').innerHTML = S.mode ? vMain() : vOnboard();
+  if (S.sheet) renderSheet();
+  if (keep) { const el = $(`[data-input="${keep.k}"]`); if (el) { el.focus(); try { el.setSelectionRange(keep.p, keep.p); } catch {} } }
+}
+function setTheme(v) {
+  if (v === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = v;
+  store.set('theme', v === 'auto' ? null : v);
+  const dark = v === 'dark' || (v === 'auto' && !window.matchMedia('(prefers-color-scheme: light)').matches);
+  document.querySelector('meta[name=theme-color]').content = dark ? '#07080d' : '#f4f5f9';
+  try { P.StatusBar && P.StatusBar.setStyle({ style: dark ? 'DARK' : 'LIGHT' }); P.StatusBar && P.StatusBar.setBackgroundColor({ color: dark ? '#07080d' : '#f4f5f9' }); } catch {}
+}
+setTheme(store.get('theme') || 'auto');
+window.matchMedia('(min-width: 980px)').addEventListener?.('change', () => { if (S.sheet === 'device' && wide()) closeSheet(); render(); });
+
+/* ---------- events ----------------------------------------------------- */
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, mac = el.dataset.mac;
+  ({
+    discover: () => discover(),
+    choose: () => choose(Number(el.dataset.i)),
+    back: () => { S.step = 'find'; S.pick = null; S.problem = null; render(); },
+    demo: () => { S.mode = 'demo'; store.set('demo', '1'); demoReset(); refresh(); },
+    'leave-demo': () => forget(),
+    refresh: () => { haptic(); refresh().then(() => toast('Up to date')); },
+    settings: () => openSheet('settings'),
+    about: () => openSheet('about'),
+    close: () => closeAny(),
+    dismiss: () => { S.problem = null; render(); },
+    filter: () => { S.filter = el.dataset.v; render(); },
+    theme: () => { setTheme(el.dataset.v); renderSheet(); },
+    forget: () => forget(),
+    open: () => openDevice(mac),
+    toggle: () => toggle(mac),
+    tab: () => { S.tab = el.dataset.v; render(); },
+    pick: () => { haptic(); setDevice(S.sel, el.dataset.code, true, el.dataset.prov); },
+    config: () => getConfig(mac),
+  }[a] || (() => {}))();
+});
+document.addEventListener('input', (e) => { if (e.target.dataset.input === 'q') { S.q = e.target.value; render(); } });
+document.addEventListener('submit', (e) => {
+  const f = e.target.closest('[data-form]'); if (!f) return; e.preventDefault();
+  const fd = new FormData(f);
+  if (f.dataset.form === 'address') useAddress(String(fd.get('address') || ''));
+  if (f.dataset.form === 'scan') {
+    const m = /^(\d{1,3}\.\d{1,3}\.\d{1,3})(?:\.\d{0,3})?$/.exec(String(fd.get('prefix') || '').trim());
+    if (!m) { S.problem = 'Type the first three parts of your network, e.g. 192.168.1'; render(); return; }
+    try { assertPrivateHost(`http://${m[1]}.1`); } catch (err) { S.problem = err.message; render(); return; }
+    store.set('lastPrefix', m[1]);
+    discover(m[1]); }
+  if (f.dataset.form === 'claim') claim(String(fd.get('code') || ''), String(fd.get('name') || '').trim());
+  if (f.dataset.form === 'rename') saveName(f.dataset.mac, String(fd.get('name') || '').trim());
+});
+// Android back: close a sheet first, otherwise go to the background rather than quit.
+try { P.App && P.App.addListener('backButton', () => { if ($('#sheet').open || (wide() && S.sel)) closeAny(); else P.App.minimizeApp(); }); } catch {}
+try { P.App && P.App.addListener('resume', () => { if (S.mode) refresh(); }); } catch {}
+
+/* =====================================================================
+   DEMO — clearly labelled sample data in the node-agent's exact shapes.
+   ===================================================================== */
+let D;
+function demoReset() {
+  const c = (code, label, n) => ({ code, label, provider: 'vpngate', available: true, serverCount: n });
+  D = {
+    regions: { label: 'Shield', controlPlaneReachable: true, vpnGateAvailable: true, refreshing: false, regions: [
+      { code: 'za', label: 'South Africa', provider: 'headscale', available: true }, { code: 'uk', label: 'United Kingdom', provider: 'headscale', available: false },
+      c('AU', 'Australia', 3), c('BR', 'Brazil', 2), c('CA', 'Canada', 4), c('DE', 'Germany', 6), c('FR', 'France', 3), c('GB', 'United Kingdom', 5), c('IN', 'India', 2),
+      c('JP', 'Japan', 61), c('KR', 'South Korea', 38), c('NL', 'Netherlands', 4), c('SG', 'Singapore', 3), c('US', 'United States', 22), c('ZA', 'South Africa', 1)] },
+    continents: { continents: [
+      ['africa', 'Africa', 'ZA', 'South Africa', 1, 1], ['asia', 'Asia', 'JP', 'Japan', 4, 104], ['europe', 'Europe', 'DE', 'Germany', 4, 18],
+      ['north-america', 'North America', 'US', 'United States', 2, 26], ['oceania', 'Oceania', 'AU', 'Australia', 1, 3], ['south-america', 'South America', 'BR', 'Brazil', 1, 2],
+    ].map(([code, label, b, bl, cc2, sc]) => ({ code, label, provider: 'vpngate', available: true, bestCountryCode: b, bestCountryLabel: bl, countryCount: cc2, serverCount: sc })) },
+    devices: { devices: [
+      { mac: 'a4:83:e7:10:22:01', region: 'GB', enabled: true, peerRegistered: false, provider: 'vpngate' },
+      { mac: '3c:22:fb:44:9a:0e', region: 'za', enabled: true, peerRegistered: true, provider: 'headscale' },
+      { mac: 'f0:18:98:00:11:7c', region: 'JP', enabled: false, peerRegistered: false, provider: 'vpngate' }] },
+    clients: { gap: null, clients: [
+      { ip: '192.168.1.21', mac: 'a4:83:e7:10:22:01', hostname: null, interface: 'eth0', vendor: 'Samsung', ownerName: 'Living room TV', label: 'Living room TV' },
+      { ip: '192.168.1.34', mac: '3c:22:fb:44:9a:0e', hostname: null, interface: 'eth0', vendor: 'Apple', ownerName: "Dad's MacBook", label: "Dad's MacBook" },
+      { ip: '192.168.1.40', mac: 'f0:18:98:00:11:7c', hostname: null, interface: 'eth0', vendor: 'Apple', ownerName: null, label: 'Apple 117C' },
+      { ip: '192.168.1.52', mac: 'da:a1:19:5e:30:4b', hostname: null, interface: 'eth0', vendor: null, randomisedMac: true, ownerName: "Kyle's phone", label: "Kyle's phone" },
+      { ip: '192.168.1.60', mac: '00:1d:d8:7a:21:9f', hostname: null, interface: 'eth0', vendor: 'Microsoft', ownerName: 'Xbox', label: 'Xbox' },
+      { ip: '192.168.1.71', mac: '24:0a:c4:9b:11:02', hostname: null, interface: 'eth0', vendor: 'Espressif', ownerName: null, label: 'Espressif 1102' }] },
+  };
+}
+async function demoApi(path, method, body) {
+  if (!D) demoReset();
+  await new Promise((r) => setTimeout(r, 180));
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  if (path === '/vpn/regions') return clone(D.regions);
+  if (path === '/vpn/continents') return clone(D.continents);
+  if (path === '/vpn/devices') return clone(D.devices);
+  if (path === '/clients') return clone(D.clients);
+  let m;
+  if ((m = /^\/vpn\/devices\/([^/]+)\/vpngate-config$/.exec(path))) {
+    const d = D.devices.devices.find((x) => x.mac === decodeURIComponent(m[1]));
+    if (!d || !d.enabled || d.provider !== 'vpngate' || !d.region) return { available: false, error: 'this device has no active VPN Gate selection' };
+    return { available: true, error: null, countryCode: d.region, countryName: regionLabel(d.region, 'vpngate'), hostname: 'demo-sample.example', ip: '192.0.2.10', score: 0, pingMs: 42, speedMbps: 88.4,
+      configText: "# Ionity's Opensource VPN — DEMO FILE. Sample only; this will not connect.\nclient\ndev tun\nproto tcp\nremote 192.0.2.10 443\n" };
+  }
+  if ((m = /^\/vpn\/devices\/([^/]+)$/.exec(path)) && method === 'PUT') {
+    const mac = decodeURIComponent(m[1]);
+    let d = D.devices.devices.find((x) => x.mac === mac);
+    if (!d) { d = { mac, region: null, enabled: false, peerRegistered: false }; D.devices.devices.push(d); }
+    const reg = D.regions.regions.find((r) => r.code === body.region && r.provider === body.provider);
+    Object.assign(d, { region: body.region, enabled: body.enabled, provider: body.provider, peerRegistered: body.provider === 'headscale' && body.enabled && !!reg?.available });
+    return { ...d, applying: false, lastError: body.enabled && reg && !reg.available ? `the exit server for '${body.region}' is not reachable right now` : null };
+  }
+  if ((m = /^\/clients\/([^/]+)\/name$/.exec(path)) && method === 'PUT') {
+    const c = D.clients.clients.find((x) => x.mac === decodeURIComponent(m[1]));
+    if (c) { c.ownerName = body.name || null; c.label = body.name || (c.vendor ? `${c.vendor} ${c.mac.slice(-5).replace(':', '').toUpperCase()}` : c.mac); }
+    return clone(D.clients);
+  }
+  throw new ApiError('Not available in demo.', 404, false);
+}
+
+/* ---------- boot ------------------------------------------------------- */
+render();
+if (S.mode) { if (S.mode === 'demo') demoReset(); refresh(); startPolling(); }
+setTimeout(() => { try { P.Splash && P.Splash.hide({ fadeOutDuration: 250 }); } catch {} }, 150);
+</script>
+</body>
+</html>

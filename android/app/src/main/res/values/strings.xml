@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ionity VPN</string>
+    <string name="title_activity_main">Ionity VPN</string>
+    <string name="package_name">today.ionity.opensourcevpn</string>
+    <string name="custom_url_scheme">today.ionity.opensourcevpn</string>
+</resources>

@@ -1,0 +1,31 @@
+{
+  "name": "ionity-opensource-vpn",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Ionity's Opensource VPN \u2014 per-device region control for a Gate^Flame box (Android app + single-file web app).",
+  "license": "CC-BY-NC-SA-4.0",
+  "author": "Ionity (Pty) Ltd \u2014 AEDI",
+  "homepage": "https://www.ionity.today",
+  "scripts": {
+    "build:web": "node scripts/build.mjs",
+    "sync": "node scripts/build.mjs && cap sync android",
+    "test": "node tests/e2e.mjs",
+    "build:apk-debug": "node scripts/build.mjs && cap sync android && node scripts/gradle.mjs assembleDebug",
+    "build:apk": "node scripts/build.mjs && cap sync android && node scripts/gradle.mjs assembleRelease",
+    "build:aab": "node scripts/build.mjs && cap sync android && node scripts/gradle.mjs bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.4.0",
+    "@capacitor/filesystem": "^7.1.0",
+    "@capacitor/haptics": "^7.0.5",
+    "@capacitor/share": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.5",
+    "@capacitor/status-bar": "^7.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.0",
+    "playwright": "1.56"
+  }
+}
