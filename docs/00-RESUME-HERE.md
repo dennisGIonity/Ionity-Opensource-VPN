@@ -3,8 +3,8 @@
 Doc: IOV-STATE-0.2.0 · Updated 2026-10-09 SAST · Ionity (Pty) Ltd — AEDI · Policy 986 AED · CC BY-NC-SA 4.0
 
 ## Where it stands
-- **v0.2.0** built and tested — GitHub release v0.2.0 carries the debug APK (versionCode 2) and the
-  single-file HTML.
+- **v0.2.0** built and tested — debug APK (versionCode 2) and single-file HTML, published as GitHub
+  release v0.2.0 by `tools\publish-to-github.cmd`.
 - 14/14 e2e tests pass against the mock node; the suite was checked non-vacuous.
 - APK read back: bundled `index.html` hash matches `www/`, 6 Capacitor plugins + native `LanInfo`
   plugin in the dex, cleartext + network-security config, backup disabled, splash, themed icon.
@@ -27,7 +27,11 @@ docs/                   DESIGN, PARITY, screenshots
 ```
 
 ## Next, in order
-1. ~~Own repo~~ — done 2026-10-09: https://github.com/dennisGIonity/Ionity-Opensource-VPN (public), release v0.2.0 with the APK attached. Clone it to the working folder you connect to the new Cowork project.
+1. **Own repo**: this folder is already a git repo (2 commits, identity DennisIonity). Run
+   `tools\publish-to-github.cmd` once: it logs the GitHub CLI in, creates
+   `github.com/dennisGIonity/Ionity-Opensource-VPN` (public), pushes `main` and publishes release v0.2.0
+   with the APK and HTML. (The cloud session could not create repos, and SSH on this PC failed host-key
+   verification, so it is one command for you.)
 2. **On-device test** against the lab box: bring up `192.168.124.3:8080` (it did not answer on
    2026-10-09), connect the phone over adb, run `tools\install-apk.cmd`, pair, switch a device on,
    get a connection file, confirm the OpenVPN app appears in the share sheet.
