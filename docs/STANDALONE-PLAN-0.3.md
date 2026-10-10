@@ -14,7 +14,7 @@ and runs its own tunnel.
 | Tunnel | **One tap inside the app** — Android `VpnService` + embedded OpenVPN engine (ics-openvpn, skeleton/ovpn2) |
 | Desktop | "Send to desktop" shares a self-contained `.html`: snapshot of the best servers per country, the desktop downloads its **own** `.ovpn` for OpenVPN Connect |
 | Web build | Dropped as a product |
-| Licence | **GPL-2.0** (OpenVPN 2.x is GPLv2-only). Ionity name and logo stay trademarks |
+| Licence | **GPL-3.0-or-later** (from 0.4.0: engine is OpenVPN 3 core, MPL-2.0). Ionity name and logo stay trademarks |
 
 ## Licence notes
 - WireGuard's Android tunnel library is Apache-2.0 (treated as GPLv2-incompatible by the FSF): pick the engine for Ionity regions when those servers exist (wireguard-go is MIT).

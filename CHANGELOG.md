@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-10-10 — GPL-3.0, own engine
+- **Licence → GPL-3.0-or-later.** ics-openvpn (GPL-2.0-only) is removed.
+- **New tunnel engine: OpenVPN 3 core** (release/3.11, used under MPL-2.0) + OpenSSL 3.5.9 + asio + LZ4,
+  built into `libionityvpn.so` by `engine/build-engine.sh`; SWIG bindings in `android/.../ovpn3/`.
+- Ionity's own `EngineClient` (tun builder, socket protect, events, log), `IonityVpnService` (VpnService,
+  foreground notification with Disconnect) and a rewritten `IonityVpnPlugin` (same JS API).
+- Runs in the app's own process; no keep-alive job, no boot receiver, no exported control API.
+- All 98 live VPN Gate configs checked against the OpenVPN 3 parser (0 errors).
+
 ## 0.3.1 — 2026-10-10 — connects on the phone
 - **Fixed: the VPN engine crashed on every connect** ("app keeps failing"). ics-openvpn's keep-alive job was scheduled as *persisted*; Samsung's JobScheduler rejected it and killed the `:openvpn` process. `tools/engine/patch_ics.py` now makes it non-persisted and non-fatal; engine AAR rebuilt.
 - In-app engine configs add `tls-cert-profile insecure` so OpenSSL 3 accepts VPN Gate's SoftEther certificates (desktop / hand-off files unchanged).

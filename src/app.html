@@ -2,12 +2,12 @@
 <!--
   Ionity VPN — standalone VPN. Pick a continent or a country; this device appears to be there.
   Doc: IOV-APP-0.3.0 | Ionity (Pty) Ltd — AEDI | Governance: Policy 986 AED
-  Licence: GPL-2.0 (see LICENSE). Ionity name and marks: TM2, not covered by the code licence.
+  Licence: GPL-3.0-or-later (see LICENSE). Ionity name and marks: TM2, not covered by the code licence.
   (c) 2018-2026 Antwerp Designs | Ionity (Pty) Ltd — TM2 | https://www.ionity.today
 
   SOURCE FILE. `node scripts/build.mjs` inlines fonts + wordmark and writes www/index.html.
   No server of ours is involved: the app downloads the VPN Gate server list itself and, in the
-  APK, runs the tunnel itself through the native IonityVpn plugin (Android VpnService).
+  APK, runs the tunnel itself: OpenVPN 3 core via the native IonityVpn plugin (Android VpnService).
 -->
 <html lang="en">
 <head>
@@ -274,7 +274,7 @@ dialog.sheet::backdrop{background:rgba(3,4,8,.62);-webkit-backdrop-filter:blur(5
 /* =====================================================================
    Ionity VPN — app logic. One file, no framework, no server of ours.
    ===================================================================== */
-const APP = { name: 'Ionity VPN', version: '0.3.0' };
+const APP = { name: 'Ionity VPN', version: '0.4.0' };
 const WORDMARK = 'data:image/png;base64,__WORDMARK__';
 const FEED = (() => { try { return new URLSearchParams(location.search).get('feed'); } catch { return null; } })() || 'http://www.vpngate.net/api/iphone/';
 const FEED_TIMEOUT_MS = 30000;
@@ -661,7 +661,7 @@ function vDesktop() {
     <button class="btn pri" data-act="desktop" ${S.data ? '' : 'disabled'}>${ic('send')} Send to desktop</button></div></div></div>`;
 }
 function vFoot() {
-  return `<footer class="foot"><img class="wm" src="${WORDMARK}" alt="Ionity"><span>${esc(APP.name)} v${APP.version}</span><span>GPL-2.0 · Policy 986 AED</span>
+  return `<footer class="foot"><img class="wm" src="${WORDMARK}" alt="Ionity"><span>${esc(APP.name)} v${APP.version}</span><span>GPL-3.0 · Policy 986 AED</span>
     <span class="r">© 2018–2026 Antwerp Designs | Ionity (Pty) Ltd · <a href="https://www.ionity.today" target="_blank" rel="noopener">ionity.today</a> · Building Tomorrow, Today.</span></footer>`;
 }
 function vSettings() {
@@ -671,11 +671,11 @@ function vSettings() {
     <div class="ch-sec">Appearance</div>
     <div class="seg full">${['auto', 'dark', 'light'].map((v) => `<button data-act="theme" data-v="${v}" aria-pressed="${th === v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div>
     <div class="ch-sec">Server list</div>
-    <dl class="spec" style="margin-top:0"><dt>Source</dt><dd>VPN Gate (vpngate.net)</dd><dt>Updated</dt><dd>${d ? ago(d.at) : '—'}</dd><dt>Countries</dt><dd>${d ? d.countries.length : '—'}</dd><dt>Tunnel</dt><dd>${S.engine ? 'Built in (OpenVPN)' : 'Hand-off to OpenVPN app'}</dd></dl>
+    <dl class="spec" style="margin-top:0"><dt>Source</dt><dd>VPN Gate (vpngate.net)</dd><dt>Updated</dt><dd>${d ? ago(d.at) : '—'}</dd><dt>Countries</dt><dd>${d ? d.countries.length : '—'}</dd><dt>Tunnel</dt><dd>${S.engine ? 'Built in (OpenVPN 3)' : 'Hand-off to OpenVPN app'}</dd></dl>
     <div style="height:12px"></div><button class="btn" data-act="reload">${ic('sync')} Reload server list now</button>
     ${S.engine ? `<div style="height:10px"></div><button class="btn ghost" data-act="log">${ic('info')} Connection log</button>` : ''}
     <div class="ch-sec">About</div>
-    <div class="prose"><p><b>${esc(APP.name)}</b> — open source under GPL-2.0. The Ionity name and logo are trademarks.</p>
+    <div class="prose"><p><b>${esc(APP.name)}</b> — open source under GPL-3.0 (or later). The Ionity name and logo are trademarks.</p>
     <p class="muted">© 2018–2026 Antwerp Designs | Ionity (Pty) Ltd — TM2 · Policy 986 AED · www.ionity.today<br>Building Tomorrow, Today.</p></div>
   </div>`;
 }

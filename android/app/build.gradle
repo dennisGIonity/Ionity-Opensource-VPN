@@ -7,8 +7,8 @@ android {
         applicationId "today.ionity.opensourcevpn"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "0.3.1"
+        versionCode 5
+        versionName "0.4.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -33,10 +33,6 @@ android {
             }
         }
     }
-    // The OpenVPN engine runs libovpnexec.so as a program, so native libs must be extracted on install.
-    packagingOptions {
-        jniLibs { useLegacyPackaging true }
-    }
     buildTypes {
         release {
             if (ksFile.exists()) signingConfig signingConfigs.release
@@ -58,11 +54,8 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
-    // Tunnel engine: ics-openvpn v0.7.58 (GPLv2), skeleton/ovpn2 flavour, built as an AAR by tools/engine/build-engine.cmd
-    implementation files('libs/ics-openvpn-0.7.58-skeleton-ovpn2.aar')
-    implementation "androidx.annotation:annotation:1.9.1"
+    // Tunnel engine: OpenVPN 3 core (MPL-2.0) in src/main/jniLibs/*/libionityvpn.so, built by engine/build-engine.sh
     implementation "androidx.core:core:$androidxCoreVersion"
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.0.21"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

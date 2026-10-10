@@ -2,7 +2,7 @@ This project is **Ionity VPN** (appId `today.ionity.opensourcevpn`). Read `docs/
 
 What it is (from 0.3.0): a **standalone Android VPN**. The app reads the VPN Gate server list itself,
 lets the user pick a continent (→ its best country) or an exact country, and runs the tunnel in-app
-(Android `VpnService` + embedded OpenVPN engine, native plugin `IonityVpn`). No Gate^Flame box, no
+(Android `VpnService` + embedded OpenVPN 3 core `libionityvpn.so`, native plugin `IonityVpn`). No Gate^Flame box, no
 discovery, no pairing. "Send to desktop" shares an HTML page that gives a computer its own `.ovpn`.
 Ionity's own WireGuard regions come later.
 
@@ -11,7 +11,7 @@ founder and appears in document headers only — never as a git author.
 
 Decided:
 - Standalone. Servers = VPN Gate now + Ionity's own later. Continent picker stays.
-- Tunnel = one tap in-app. Licence = GPL-2.0 (OpenVPN 2.x is GPLv2-only).
+- Tunnel = one tap in-app, OpenVPN 3 core (MPL-2.0) — `engine/`. Licence = GPL-3.0-or-later (since 0.4.0; ics-openvpn/GPL-2.0 removed).
 - Android only; the only HTML besides the app layer is the desktop share page.
 
 Working rules:

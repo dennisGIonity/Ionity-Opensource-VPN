@@ -4,15 +4,15 @@ Pick a continent or a country — whatever you connect to sees you there.
 
 Ionity VPN is a standalone Android VPN. It downloads the live public server list from
 [VPN Gate](https://www.vpngate.net) itself, picks the best server in the place you choose, and
-runs the tunnel itself (Android `VpnService` + embedded OpenVPN engine). No account, no box,
+runs the tunnel itself (Android `VpnService` + embedded OpenVPN 3 core). No account, no box,
 no server of ours in the middle. A **Send to desktop** button gives a computer its own
 connection file for OpenVPN Connect.
 
 | | |
 |---|---|
 | App | `today.ionity.opensourcevpn` · "Ionity VPN" · Android 6.0+ |
-| Source | `src/app.html` (UI) · `android/` (Capacitor shell + native tunnel plugin) |
-| Licence | GPL-2.0 — see `LICENSE`. Ionity name and logo are trademarks (TM2). |
+| Source | `src/app.html` (UI) · `android/` (Capacitor shell + VPN service) · `engine/` (OpenVPN 3 build) |
+| Licence | GPL-3.0-or-later — see `LICENSE`. Ionity name and logo are trademarks (TM2). |
 | Owner | Ionity (Pty) Ltd — AEDI · www.ionity.today · Policy 986 AED |
 
 ## Build
@@ -20,6 +20,7 @@ connection file for OpenVPN Connect.
 npm ci
 npm test                    # e2e against a mock VPN Gate feed (Playwright)
 npm run build:apk-debug     # android/app/build/outputs/apk/debug/app-debug.apk
+# engine (only when changing it): ANDROID_NDK_ROOT=... engine/build-engine.sh   (Linux/WSL)
 tools\install-apk.cmd       # install + launch on the phone connected over adb
 ```
 

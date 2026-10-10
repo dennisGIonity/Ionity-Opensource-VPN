@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- allowBackup=false: nothing in this app needs restoring onto another phone. -->
     <application
@@ -12,8 +11,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:theme="@style/AppTheme"
-        tools:replace="android:allowBackup,android:icon,android:roundIcon,android:label,android:theme">
+        android:theme="@style/AppTheme">
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
@@ -31,24 +29,17 @@
 
         </activity>
 
-        <!-- The engine's notification opens "<package>.activities.MainActivity": point it at ours. -->
-        <activity-alias
-            android:name=".activities.MainActivity"
-            android:targetActivity=".MainActivity"
-            android:exported="false" />
-
-        <!-- Embedded OpenVPN engine (ics-openvpn): keep the VPN service, drop its public
-             control API, boot receiver and app-restrictions, which this app does not use. -->
-        <service android:name="de.blinkt.openvpn.api.ExternalOpenVPNService" tools:node="remove" />
-        <activity android:name="de.blinkt.openvpn.api.GrantPermissionsActivity" tools:node="remove" />
-        <activity android:name="de.blinkt.openvpn.api.ConfirmDialog" tools:node="remove" />
-        <activity android:name="de.blinkt.openvpn.api.RemoteAction" tools:node="remove" />
-        <activity-alias android:name="de.blinkt.openvpn.api.ConnectVPN" tools:node="remove" />
-        <activity-alias android:name="de.blinkt.openvpn.api.DisconnectVPN" tools:node="remove" />
-        <activity-alias android:name="de.blinkt.openvpn.api.PauseVPN" tools:node="remove" />
-        <activity-alias android:name="de.blinkt.openvpn.api.ResumeVPN" tools:node="remove" />
-        <receiver android:name="de.blinkt.openvpn.OnBootReceiver" tools:node="remove" />
-        <meta-data android:name="android.content.APP_RESTRICTIONS" tools:node="remove" />
+        <!-- The tunnel: OpenVPN 3 core inside this app (libionityvpn.so), run by IonityVpnService. -->
+        <service
+            android:name=".IonityVpnService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="vpn" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -62,9 +53,10 @@
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:node="remove" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
-    <!-- The tunnel engine watches for network changes to reconnect. Normal permission, no prompt. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The tunnel reconnects when the network changes. Normal permission, no prompt. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Haptic tick on connect. Normal permission, no prompt. -->
     <uses-permission android:name="android.permission.VIBRATE" />
