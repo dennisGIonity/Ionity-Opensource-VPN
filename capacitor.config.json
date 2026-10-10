@@ -2,15 +2,30 @@
   "appId": "today.ionity.opensourcevpn",
   "appName": "Ionity VPN",
   "webDir": "www",
-  "server": { "androidScheme": "http", "cleartext": true },
+  "server": {
+    "androidScheme": "https"
+  },
   "android": {
-    "allowMixedContent": true,
     "backgroundColor": "#07080d",
     "adjustMarginsForEdgeToEdge": "auto",
     "webContentsDebuggingEnabled": false
   },
   "plugins": {
-    "SplashScreen": { "launchShowDuration": 2500, "launchAutoHide": true, "launchFadeOutDuration": 250, "backgroundColor": "#07080d", "showSpinner": false, "androidScaleType": "CENTER_CROP" },
-    "StatusBar": { "style": "DARK", "backgroundColor": "#07080d", "overlaysWebView": false }
+    "SplashScreen": {
+      "launchShowDuration": 2500,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 250,
+      "backgroundColor": "#07080d",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#07080d",
+      "overlaysWebView": false
+    },
+    "CapacitorHttp": {
+      "enabled": true
+    }
   }
 }

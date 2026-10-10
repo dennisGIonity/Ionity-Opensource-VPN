@@ -8,7 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // Local plugins must be registered before super.onCreate builds the bridge.
-        registerPlugin(LanInfoPlugin.class);
+        registerPlugin(IonityVpnPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

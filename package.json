@@ -1,10 +1,10 @@
 {
   "name": "ionity-opensource-vpn",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "private": true,
-  "description": "Ionity's Opensource VPN \u2014 per-device region control for a Gate^Flame box (Android app + single-file web app).",
-  "license": "CC-BY-NC-SA-4.0",
-  "author": "Ionity (Pty) Ltd \u2014 AEDI",
+  "description": "Ionity VPN — standalone Android VPN: pick a continent or country and appear there. Server list from VPN Gate, tunnel built in.",
+  "license": "GPL-2.0-only",
+  "author": "Ionity (Pty) Ltd — AEDI",
   "homepage": "https://www.ionity.today",
   "scripts": {
     "build:web": "node scripts/build.mjs",

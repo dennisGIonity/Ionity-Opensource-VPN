@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Gate^Flame node-agent speaks plain HTTP on the LAN (:8080), so cleartext must be
-     permitted. The narrowing happens in the app, on every request: assertPrivateHost()
-     refuses to send the pairing token over HTTP to anything but RFC1918, loopback,
-     link-local or .local addresses. Same model as Gate^Flame's own app. -->
+<!-- VPN Gate publishes its server list over plain HTTP only (www.vpngate.net/api/iphone/).
+     The list is read by native HTTP (CapacitorHttp); the tunnel itself is OpenVPN/TLS. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors><certificates src="system" /></trust-anchors>
     </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">vpngate.net</domain>
+    </domain-config>
 </network-security-config>

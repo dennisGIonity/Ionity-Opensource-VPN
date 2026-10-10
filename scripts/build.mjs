@@ -11,6 +11,9 @@ const map = {
   __F_MONO__: b64('jetbrains-mono-latin-wght-normal.woff2'),
   __WORDMARK__: b64('ionity-wordmark.png'),
 };
+// Capacitor's JS runtime. The native bridge alone has no registerPlugin(); without this, no plugin is reachable.
+map.__CAPACITOR_CORE__ = readFileSync(new URL('node_modules/@capacitor/core/dist/capacitor.js', root), 'utf8')
+  .replace(/\/\/# sourceMappingURL=.*$/m, '').replace(/<\/script/gi, '<\\/script');
 for (const [k, v] of Object.entries(map)) {
   if (!html.includes(k)) throw new Error(`placeholder ${k} missing`);
   html = html.split(k).join(v);

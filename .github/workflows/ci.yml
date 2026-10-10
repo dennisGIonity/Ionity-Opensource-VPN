@@ -14,11 +14,9 @@ jobs:
       - uses: android-actions/setup-android@v3
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: e2e against the mock node-agent
-        run: |
-          python3 tests/mock_node.py 8080 &
-          sleep 1
-          CHROMIUM=$(node -e "console.log(require('playwright').chromium.executablePath())") npm test
+      - run: npm run build:web
+      - name: e2e against a mock VPN Gate feed
+        run: CHROMIUM=$(node -e "console.log(require('playwright').chromium.executablePath())") npm test
       - name: Build debug APK
         run: npm run build:apk-debug
       - name: Read back the APK (bundled web layer must match www/)
@@ -27,5 +25,5 @@ jobs:
           test "$(unzip -p $A assets/public/index.html | sha256sum)" = "$(sha256sum < www/index.html)"
       - uses: actions/upload-artifact@v4
         with:
-          name: ionity-opensource-vpn-debug-apk
+          name: ionity-vpn-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
