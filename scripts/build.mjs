@@ -1,6 +1,6 @@
 // Inlines the fonts and wordmark into src/app.html and writes www/index.html.
 // One self-contained file: it is the web app AND the APK's web layer (no network fetches).
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 const root = new URL('..', import.meta.url);
 const b64 = (f) => readFileSync(new URL(`src/${f}`, root)).toString('base64');
@@ -14,6 +14,9 @@ const map = {
 // Capacitor's JS runtime. The native bridge alone has no registerPlugin(); without this, no plugin is reachable.
 map.__CAPACITOR_CORE__ = readFileSync(new URL('node_modules/@capacitor/core/dist/capacitor.js', root), 'utf8')
   .replace(/\/\/# sourceMappingURL=.*$/m, '').replace(/<\/script/gi, '<\\/script');
+// Built-in server list (scripts/snapshot.mjs). Optional: without it the app simply waits for the live list.
+const snap = new URL('src/servers-snapshot.json', root);
+map.__SNAPSHOT__ = existsSync(snap) ? readFileSync(snap, 'utf8').trim().replace(/</g, '\\u003c') : 'null';
 for (const [k, v] of Object.entries(map)) {
   if (!html.includes(k)) throw new Error(`placeholder ${k} missing`);
   html = html.split(k).join(v);

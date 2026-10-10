@@ -224,6 +224,24 @@ await test('phone width 360: nothing overflows', async (p) => {
   assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= 360));
 }, { viewport: { width: 360, height: 780 } });
 
+await (async () => { // desktop/browser version: built-in list, no live fetch, .ovpn download
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+  const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
+  try {
+    await p.goto(new URL('../www/index.html', import.meta.url).href);
+    const snap = await p.evaluate(() => typeof SNAPSHOT !== 'undefined' && SNAPSHOT && SNAPSHOT.countries.length);
+    if (!snap) { console.log('  - browser version: no built-in list in this build (run scripts/snapshot.mjs) — skipped'); return; }
+    await p.waitForSelector('.opt:not(:disabled)');
+    assert.match(await p.textContent('.note'), /Desktop version/);
+    assert.equal(await p.locator('[data-act=reload]').count(), 0, 'no reload in a browser');
+    const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-act=power]')]);
+    assert.match(dl.suggestedFilename(), /^ionity-vpn-[a-z]{2}\.ovpn$/);
+    assert.doesNotMatch(await read(dl), /tls-cert-profile/);
+    assert.deepEqual(errs, [], 'no errors (no blocked VPN Gate fetch)');
+    console.log('  ✓ browser version: built-in list, no live fetch, hands out .ovpn files'); pass++;
+  } catch (e) { console.log('  ✗ browser version', '\n     ', e.message.split('\n')[0]); fail++; } finally { await ctx.close(); }
+})();
+
 await browser.close(); srv.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

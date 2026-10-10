@@ -12,7 +12,9 @@
     "test": "node tests/e2e.mjs",
     "build:apk-debug": "node scripts/build.mjs && cap sync android && node scripts/gradle.mjs assembleDebug",
     "build:apk": "node scripts/build.mjs && cap sync android && node scripts/gradle.mjs assembleRelease",
-    "build:aab": "node scripts/build.mjs && cap sync android && node scripts/gradle.mjs bundleRelease"
+    "build:aab": "node scripts/build.mjs && cap sync android && node scripts/gradle.mjs bundleRelease",
+    "snapshot": "node scripts/snapshot.mjs",
+    "release": "node scripts/snapshot.mjs && npm run build:apk-debug"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.0",

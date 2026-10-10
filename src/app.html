@@ -276,7 +276,10 @@ dialog.sheet::backdrop{background:rgba(3,4,8,.62);-webkit-backdrop-filter:blur(5
    ===================================================================== */
 const APP = { name: 'Ionity VPN', version: '0.4.0' };
 const WORDMARK = 'data:image/png;base64,__WORDMARK__';
-const FEED = (() => { try { return new URLSearchParams(location.search).get('feed'); } catch { return null; } })() || 'http://www.vpngate.net/api/iphone/';
+const FEED_PARAM = (() => { try { return new URLSearchParams(location.search).get('feed'); } catch { return null; } })();
+const FEED = FEED_PARAM || 'http://www.vpngate.net/api/iphone/';
+// Server list baked in at build time (scripts/snapshot.mjs). First-run fallback in the app; the list in a browser.
+const SNAPSHOT = __SNAPSHOT__;
 const FEED_TIMEOUT_MS = 30000;
 const STALE_MS = 20 * 60 * 1000;      // re-read the list when it is older than this
 const CONNECT_TIMEOUT_MS = 30000;     // per server; then the next-best server in the same country is tried
@@ -297,6 +300,8 @@ const NAME_FIX = { KR: 'South Korea', KP: 'North Korea', VN: 'Vietnam', RU: 'Rus
 /* ---------- native bridge (present only inside the APK) -------------- */
 const Cap = window.Capacitor;
 const NATIVE = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+// A browser cannot read VPN Gate's list (no CORS headers): use the built-in list and hand out .ovpn files.
+const BROWSER = !NATIVE && !FEED_PARAM;
 const TESTP = window.__iovTestPlugins || null; // e2e only: stand-in native plugins
 const plugin = (n) => { if (TESTP) return TESTP[n] || null; if (!NATIVE) return null; try { return (Cap.Plugins && Cap.Plugins[n]) || Cap.registerPlugin(n); } catch { return null; } };
 const P = { App: plugin('App'), Share: plugin('Share'), Filesystem: plugin('Filesystem'), Haptics: plugin('Haptics'),
@@ -313,7 +318,7 @@ const readJSON = (k) => { try { return JSON.parse(store.get(k) || 'null'); } cat
 /* ---------- state ----------------------------------------------------- */
 const S = {
   data: null,          // { at, countries:[{cc,name,continent,servers:[...]}], continents:[...] }
-  loading: false, loadErr: null,
+  loading: false, loadErr: null, src: null, // src: live | cache | snapshot
   choice: readJSON('choice') || { kind: 'continent', code: 'europe' },
   vpn: { state: 'off' }, // off | connecting | on | handoff | error
   engine: false,         // true when the native tunnel is in this build
@@ -382,15 +387,15 @@ function compact(d) { // what we cache and what the desktop page carries: the be
 function fromCompact(x) { if (!x || !Array.isArray(x.countries)) return null; x.countries.forEach((c) => { c.best = c.servers[0]?.score || 0; }); return { at: x.at, countries: x.countries, continents: continentsOf(x.countries) }; }
 
 async function loadServers(force) {
-  if (S.loading) return;
+  if (S.loading || BROWSER) return;
   if (!force && S.data && Date.now() - S.data.at < STALE_MS && !S.loadErr) return;
   S.loading = true; render();
   try {
     const list = parseFeed(await getText(FEED));
     if (!list.length) throw new Error('the server list came back empty');
-    S.data = indexServers(list, Date.now()); S.loadErr = null;
+    S.data = indexServers(list, Date.now()); S.loadErr = null; S.src = 'live';
     try { store.set('cache', JSON.stringify(compact(S.data))); } catch {}
-  } catch (e) { S.loadErr = e.message || String(e); }
+  } catch (e) { const m = e.message || String(e); S.loadErr = /failed to fetch|network|no connection/i.test(m) ? 'no internet connection, or VPN Gate is not answering' : m; }
   S.loading = false; render();
 }
 
@@ -585,9 +590,10 @@ function vMain() {
     : st === 'connecting' ? `${esc(v.name)} · server ${v.i + 1} of ${v.list.length}${v.server ? ` <span class="mono">${esc(v.server.ip)}</span>` : ''}${v.detail ? ` · ${esc(v.detail.toLowerCase())}` : ''}`
     : st === 'handoff' ? (v.how === 'shared' ? 'Pick your OpenVPN app in the share sheet and tap connect there.' : 'Connection file saved — open it with OpenVPN Connect.')
     : st === 'error' ? `${esc(v.error)} ${S.engine ? '<button class="link" data-act="log">Details</button>' : ''}`
-    : t ? `Tap connect to appear in <b>${esc(t.name)}</b>.` : d ? 'Nothing live in that place right now — pick another below.' : 'Loading the server list…';
+    : t ? (BROWSER ? `Download the connection file for <b>${esc(t.name)}</b> and open it in OpenVPN Connect.` : `Tap connect to appear in <b>${esc(t.name)}</b>.`)
+      : d ? 'Nothing live in that place right now — pick another below.' : S.loading ? 'Loading the server list…' : 'No server list yet — tap Retry.';
   const pwr = st === 'on' ? 'on' : st === 'connecting' ? 'busy' : '';
-  const pwrLabel = st === 'on' ? 'Disconnect' : st === 'connecting' ? 'Cancel' : 'Connect';
+  const pwrLabel = st === 'on' ? 'Disconnect' : st === 'connecting' ? 'Cancel' : (S.engine ? 'Connect' : 'Get file');
   const where = S.choice.kind === 'continent' ? (CONTINENTS.find((k) => k.code === S.choice.code)?.label || '—') : (countryByCc(S.choice.code)?.name || S.choice.code);
   const total = d ? d.countries.reduce((n, c) => n + c.servers.length, 0) : 0;
 
@@ -596,11 +602,13 @@ function vMain() {
     <img class="wm" src="${WORDMARK}" alt="Ionity"><span class="vr"></span><span class="prod">VPN</span>
     <span class="sp"></span>
     <span class="pill"><span class="dot ${st === 'on' ? 'ok' : st === 'connecting' ? 'warn pulse' : st === 'error' ? 'bad' : ''}"></span>${st === 'on' ? esc(v.cc) : st === 'connecting' ? '…' : 'OFF'}</span>
-    <button class="ib" data-act="reload" aria-label="Reload server list">${ic('sync')}</button>
+    ${BROWSER ? '' : `<button class="ib" data-act="reload" aria-label="Reload server list">${ic('sync')}</button>`}
     <button class="ib" data-act="settings" aria-label="Settings">${ic('gear')}</button>
   </header>
   <div class="grid2">
     <div class="cola">
+      ${BROWSER ? `<div class="note">${ic('info')}<div><b>Desktop version.</b> ${d ? `Server list built into this page, taken ${new Date(d.at).toLocaleString()}.` : 'No server list is built into this page.'} Pick a place, download its file and open it in <a href="https://openvpn.net/client/" target="_blank" rel="noopener">OpenVPN Connect</a>. For live servers and one-tap connect, use the Android app.</div></div>` : ''}
+      ${S.src === 'snapshot' && !BROWSER && !S.loading ? `<div class="note">${ic('info')}<div>Using the server list built into the app (${ago(S.data.at)}) until the live list loads.</div></div>` : ''}
       ${S.loadErr ? `<div class="note ${d ? '' : 'bad'}">${ic('alert')}<div>Could not refresh the server list: ${esc(S.loadErr)}.${d ? ` Using the list from ${ago(d.at)}.` : ''}</div><button class="x" data-act="reload">Retry</button></div>` : ''}
       <section class="hero ${st === 'on' ? 'on-air' : ''}">
         <svg class="globe" viewBox="0 0 300 300" aria-hidden="true"><g fill="none" stroke="url(#ig)" stroke-width=".8">
@@ -621,12 +629,12 @@ function vMain() {
         </div>
         <div class="hero-f"><span class="tag">community servers</span><button class="link" data-act="about">About the servers</button></div>
       </section>
-      ${wide() ? vDesktop() : ''}
+      ${wide() && !BROWSER ? vDesktop() : ''}
     </div>
     <div class="colb">
       ${vContinents()}
       ${vCountries()}
-      ${wide() ? '' : vDesktop()}
+      ${wide() || BROWSER ? '' : vDesktop()}
     </div>
   </div>
   ${vFoot()}`;
@@ -634,7 +642,7 @@ function vMain() {
 
 function vContinents() {
   const d = S.data;
-  const body = !d ? '<div class="opts">' + '<div class="sk"></div>'.repeat(6) + '</div>'
+  const body = !d ? (S.loading ? '<div class="opts">' + '<div class="sk"></div>'.repeat(6) + '</div>' : '<div class="panel"><div class="empty">No server list yet.<br><button class="link" data-act="reload">Try again</button></div></div>')
     : (() => { const max = Math.max(1, ...d.continents.map((k) => k.servers));
       return `<div class="opts">${d.continents.map((k) => `<button class="opt" data-act="pick" data-kind="continent" data-code="${k.code}" aria-pressed="${S.choice.kind === 'continent' && S.choice.code === k.code}" ${k.best ? '' : 'disabled'}>
         <svg class="gl"><use href="#i-globe"/></svg><b>${esc(k.label)}</b>
@@ -644,7 +652,7 @@ function vContinents() {
 }
 function vCountries() {
   const d = S.data;
-  if (!d) return `<div class="sh"><span class="n grad-t">02</span><h2>Country</h2><span class="rule"></span></div><div class="sk"></div>`;
+  if (!d) return `<div class="sh"><span class="n grad-t">02</span><h2>Country</h2><span class="rule"></span></div>${S.loading ? '<div class="sk"></div>' : ''}`;
   const q = S.q.trim().toLowerCase();
   const name = (code) => CONTINENTS.find((k) => k.code === code)?.label || '';
   const list = d.countries.filter((c) => !q || c.name.toLowerCase().includes(q) || c.cc.toLowerCase() === q || name(c.continent).toLowerCase().includes(q));
@@ -672,7 +680,7 @@ function vSettings() {
     <div class="seg full">${['auto', 'dark', 'light'].map((v) => `<button data-act="theme" data-v="${v}" aria-pressed="${th === v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join('')}</div>
     <div class="ch-sec">Server list</div>
     <dl class="spec" style="margin-top:0"><dt>Source</dt><dd>VPN Gate (vpngate.net)</dd><dt>Updated</dt><dd>${d ? ago(d.at) : '—'}</dd><dt>Countries</dt><dd>${d ? d.countries.length : '—'}</dd><dt>Tunnel</dt><dd>${S.engine ? 'Built in (OpenVPN 3)' : 'Hand-off to OpenVPN app'}</dd></dl>
-    <div style="height:12px"></div><button class="btn" data-act="reload">${ic('sync')} Reload server list now</button>
+    ${BROWSER ? '' : `<div style="height:12px"></div><button class="btn" data-act="reload">${ic('sync')} Reload server list now</button>`}
     ${S.engine ? `<div style="height:10px"></div><button class="btn ghost" data-act="log">${ic('info')} Connection log</button>` : ''}
     <div class="ch-sec">About</div>
     <div class="prose"><p><b>${esc(APP.name)}</b> — open source under GPL-3.0 (or later). The Ionity name and logo are trademarks.</p>
@@ -751,7 +759,8 @@ async function syncEngine() {
 }
 
 /* ---------- boot ------------------------------------------------------- */
-S.data = fromCompact(readJSON('cache'));
+S.data = fromCompact(readJSON('cache')); S.src = S.data ? 'cache' : null;
+if (!S.data && SNAPSHOT && !FEED_PARAM) { S.data = fromCompact(JSON.parse(JSON.stringify(SNAPSHOT))); S.src = S.data ? 'snapshot' : null; }
 render();
 if (P.Vpn) { try { P.Vpn.addListener('state', onEngine); } catch {} syncEngine(); }
 loadServers(true);
