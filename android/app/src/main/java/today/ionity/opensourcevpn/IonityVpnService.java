@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.net.VpnService;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
@@ -59,9 +60,17 @@ public class IonityVpnService extends VpnService {
             String name = intent.getStringExtra(EXTRA_NAME);
             sessionName = name == null ? "Ionity VPN" : name;
             goForeground("Connecting…");
+            if (config == null || config.trim().isEmpty()) {
+                addLog("No connection file was passed to the VPN service.");
+                publish("ERROR", "CONFIG", "No connection file");
+                stopForegroundCompat(); stopSelf();
+                return START_NOT_STICKY;
+            }
             startSession(config);
             return START_NOT_STICKY;
         }
+        // Started by the system (always-on VPN) or restarted without a request: nothing to run.
+        stopSelf();
         return START_NOT_STICKY;
     }
 
@@ -69,12 +78,14 @@ public class IonityVpnService extends VpnService {
         stopSession();
         clearLog();
         publish("CONNECTING", "STARTING", "");
+        addLog("Starting session: " + sessionName);
         final EngineClient c = new EngineClient(this, sessionName, new EngineClient.Listener() {
             @Override public void onEvent(String name, String info, boolean error, boolean fatal) { handleEvent(name, info, error, fatal); }
             @Override public void onLog(String line) { addLog(line); }
         });
-        String bad = c.load(config);
-        if (bad != null) { addLog("Config error: " + bad); publish("ERROR", "CONFIG", bad); stopForegroundCompat(); return; }
+        String bad;
+        try { bad = c.load(config); } catch (Throwable t) { bad = String.valueOf(t); }
+        if (bad != null) { addLog("Config error: " + bad); publish("ERROR", "CONFIG", bad); stopForegroundCompat(); stopSelf(); return; }
         client = c;
         worker = new Thread(() -> {
             ClientAPI_Status st;
@@ -84,7 +95,7 @@ public class IonityVpnService extends VpnService {
                 client = null;
                 if (st.getError()) { addLog("Session ended: " + st.getStatus() + " " + st.getMessage()); publish("ERROR", st.getStatus(), st.getMessage()); }
                 else publish("DISCONNECTED", "EXITING", "");
-                stopForegroundCompat();
+                stopForegroundCompat(); stopSelf();
             }
         }, "IonityVpnEngine");
         worker.start();
@@ -114,6 +125,7 @@ public class IonityVpnService extends VpnService {
         if (l != null) l.onState(s, detail, msg == null ? "" : msg);
     }
     private static void addLog(String line) {
+        Log.i("IonityVPN", line);
         synchronized (LOG) { LOG.addLast(line); while (LOG.size() > 300) LOG.removeFirst(); }
     }
     private static void clearLog() { synchronized (LOG) { LOG.clear(); } }

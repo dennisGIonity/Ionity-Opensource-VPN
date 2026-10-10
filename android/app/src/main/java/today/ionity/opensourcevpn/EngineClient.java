@@ -58,8 +58,9 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
         c.setConnTimeout(30);
         c.setTunPersist(false);
         c.setCompressionMode("asym");
-        // VPN Gate (SoftEther) uses AES-128-CBC / SHA1 and older certificates.
-        c.setEnableLegacyAlgorithms(true);
+        // VPN Gate (SoftEther) uses AES-128-CBC / SHA1 and older certificates. Those are in OpenSSL's default
+        // provider; "legacy algorithms" (BF-CBC etc.) would need the legacy provider, which this build leaves out.
+        c.setEnableLegacyAlgorithms(false);
         c.setEnableNonPreferredDCAlgorithms(true);
         c.setTlsCertProfileOverride("insecure");
         c.setAllowLocalLanAccess(false);

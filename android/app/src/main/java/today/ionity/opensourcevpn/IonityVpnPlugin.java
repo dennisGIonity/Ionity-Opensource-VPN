@@ -34,7 +34,8 @@ import com.getcapacitor.annotation.PermissionCallback;
     permissions = { @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }) }
 )
 public class IonityVpnPlugin extends Plugin {
-    private String pendingConfig, pendingName;
+    // Static: Android may recreate the activity (and this plugin) while its VPN dialog is open.
+    private static String pendingConfig, pendingName;
 
     @Override
     public void load() {
@@ -82,6 +83,7 @@ public class IonityVpnPlugin extends Plugin {
                 .setAction(IonityVpnService.ACTION_CONNECT)
                 .putExtra(IonityVpnService.EXTRA_CONFIG, pendingConfig)
                 .putExtra(IonityVpnService.EXTRA_NAME, pendingName);
+        if (pendingConfig == null) { call.reject("The connection request was lost — tap Connect again."); return; }
         pendingConfig = null;
         try { ContextCompat.startForegroundService(ctx, i); call.resolve(); }
         catch (Exception e) { call.reject("Could not start the VPN: " + e.getMessage()); }
