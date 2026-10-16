@@ -60,4 +60,6 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Haptic tick on connect. Normal permission, no prompt. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Asked once: keeps battery optimisation from cutting a long-running tunnel. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 </manifest>

@@ -1,6 +1,6 @@
 {
   "name": "ionity-opensource-vpn",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Ionity VPN — standalone Android VPN: pick a continent or country and appear there. Server list from VPN Gate, tunnel built in.",
   "license": "GPL-3.0-or-later",

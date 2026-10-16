@@ -68,7 +68,9 @@ html{overflow-x:hidden}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;-webkit-tap-highlight-color:transparent;text-rendering:optimizeLegibility}
 body{min-height:100vh;min-height:100dvh;overflow-x:hidden;overflow-x:clip}
 button,input{font:inherit;color:inherit;letter-spacing:inherit}
-button{cursor:pointer;-webkit-user-select:none;user-select:none}
+button{cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+button,a,input,[data-act]{touch-action:manipulation}
+html{overscroll-behavior-y:none}
 a{color:inherit}
 :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:6px}
 img{display:block}
@@ -274,7 +276,7 @@ dialog.sheet::backdrop{background:rgba(3,4,8,.62);-webkit-backdrop-filter:blur(5
 /* =====================================================================
    Ionity VPN — app logic. One file, no framework, no server of ours.
    ===================================================================== */
-const APP = { name: 'Ionity VPN', version: '0.4.0' };
+const APP = { name: 'Ionity VPN', version: '0.5.0' };
 const WORDMARK = 'data:image/png;base64,__WORDMARK__';
 const FEED_PARAM = (() => { try { return new URLSearchParams(location.search).get('feed'); } catch { return null; } })();
 const FEED = FEED_PARAM || 'http://www.vpngate.net/api/iphone/';
@@ -282,7 +284,6 @@ const FEED = FEED_PARAM || 'http://www.vpngate.net/api/iphone/';
 const SNAPSHOT = __SNAPSHOT__;
 const FEED_TIMEOUT_MS = 30000;
 const STALE_MS = 20 * 60 * 1000;      // re-read the list when it is older than this
-const CONNECT_TIMEOUT_MS = 30000;     // per server; then the next-best server in the same country is tried
 const TRY_SERVERS = 3;
 
 /* Continents. Every ISO country is mapped, so any country VPN Gate (or Ionity) adds lands somewhere. */
@@ -420,66 +421,67 @@ function ovpnFor(s, name, phone) {
   if (phone && !/^\s*tls-cert-profile\s/m.test(t)) t += '\ntls-cert-profile insecure\n';
   // OpenVPN 2.6 / Connect 3 only negotiate GCM ciphers unless told otherwise; VPN Gate servers use AES-128-CBC.
   if (!/^\s*data-ciphers\s/m.test(t)) t = t.replace(/^(\s*cipher\s+(\S+).*)$/m, (m0, l, c) => `${l}\ndata-ciphers ${c}:AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305\ndata-ciphers-fallback ${c}`);
+  // Notice a dead connection quickly and reconnect, instead of hanging on a silent tunnel.
+  if (!/^\s*(keepalive|ping|ping-restart)\s/m.test(t)) t += '\nping 10\nping-restart 60\n';
   return `# Ionity VPN — ${name || s.country} · ${s.host} (${s.ip}) · VPN Gate community server\n# ${new Date().toISOString()}\n` + t;
 }
 
 /* ---------- connect / disconnect -------------------------------------- */
-let failT = null, offAt = 0;
+// The native service owns the connection: it tries the servers in order, reconnects on its own when
+// a connection drops or the network changes, and keeps running with the screen off. This layer only
+// asks for a place and shows what the service reports.
+let offAt = 0, tapAt = 0;
 async function connect() {
   const c = target();
   if (!c) { toast(S.data ? 'No server is live there right now — pick another place.' : 'The server list is still loading.'); return; }
-  clearTimeout(failT);
-  const v = S.vpn = { state: 'connecting', cc: c.cc, name: c.name, list: c.servers.slice(0, TRY_SERVERS), i: 0 };
+  const list = c.servers.slice(0, TRY_SERVERS);
+  const v = S.vpn = { state: 'connecting', cc: c.cc, name: c.name, list, server: null, re: false };
   haptic('MEDIUM'); render();
-  if (S.engine) return attempt(v, 0);
-  // No tunnel engine in this build: hand the file to the device's OpenVPN app.
-  const s = v.list[0];
-  const how = await handOff(`ionity-vpn-${c.cc.toLowerCase()}.ovpn`, ovpnFor(s, c.name), 'Open with your OpenVPN app to connect.');
-  if (S.vpn === v) { S.vpn = { state: 'handoff', cc: c.cc, name: c.name, server: s, how }; render(); }
-}
-async function attempt(v, i) {
-  if (S.vpn !== v) return;
-  const s = v.list[i];
-  if (!s) { S.vpn = { state: 'error', cc: v.cc, name: v.name, error: `None of the ${pl(v.list.length, 'server')} tried in ${v.name} answered. Tap connect to try again, or pick another place.` }; haptic('HEAVY'); render(); grabLog(); return; }
-  Object.assign(v, { i, server: s, state: 'connecting' }); render();
-  try { await P.Vpn.connect({ config: ovpnFor(s, v.name, true), name: `Ionity · ${v.name}` }); }
-  catch (e) {
+  if (!S.engine) {
+    // No tunnel engine in this build: hand the file to the device's OpenVPN app.
+    const s = list[0];
+    const how = await handOff(`ionity-vpn-${c.cc.toLowerCase()}.ovpn`, ovpnFor(s, c.name), 'Open with your OpenVPN app to connect.');
+    if (S.vpn === v) { S.vpn = { state: 'handoff', cc: c.cc, name: c.name, server: s.host + ' · ' + s.ip, how }; render(); }
+    return;
+  }
+  store.set('live', JSON.stringify({ cc: c.cc, name: c.name }));
+  try {
+    await P.Vpn.connect({ name: `Ionity · ${c.name}`, servers: list.map((s) => ({ config: ovpnFor(s, c.name, true), host: `${s.host} · ${s.ip}` })) });
+  } catch (e) {
     if (S.vpn !== v) return;
     const m = String(e?.message || e);
     S.vpn = { state: 'error', cc: v.cc, name: v.name, error: /permission|denied|cancel/i.test(m) ? 'Android needs your OK to start a VPN. Tap connect and choose OK.' : m };
-    render(); grabLog(); return;
+    store.set('live', null); render(); grabLog();
   }
-  clearTimeout(failT);
-  failT = setTimeout(() => { if (S.vpn === v && v.state === 'connecting') attempt(v, i + 1); }, CONNECT_TIMEOUT_MS);
 }
 async function grabLog() {
   try { const r = await P.Vpn.getLog(); S.log = (r && r.lines) || []; } catch { S.log = []; }
   if (S.sheet === 'log') renderSheet();
 }
 async function disconnect() {
-  clearTimeout(failT);
   S.vpn = { state: 'off' }; offAt = Date.now(); store.set('live', null); haptic(); render();
   try { P.Vpn && await P.Vpn.disconnect(); } catch {}
 }
-function onEngine(e) { // { state: CONNECTING | CONNECTED | DISCONNECTED | ERROR, detail }
-  const v = S.vpn;
+function onEngine(e) { // { state: CONNECTING | CONNECTED | RECONNECTING | DISCONNECTED | ERROR, detail, server, since }
+  const v = S.vpn, live = readJSON('live') || {};
+  const busy = e.state === 'CONNECTING' || e.state === 'RECONNECTING';
+  if (Date.now() - offAt < 4000 && e.state !== 'DISCONNECTED') return; // late event from a tunnel the user just stopped
   if (e.state === 'CONNECTED') {
-    if (v.state !== 'connecting' && v.state !== 'on') {
-      if (Date.now() - offAt < 4000) return; // late event from a tunnel the user just stopped // connected outside a request (e.g. app relaunched)
-      const live = readJSON('live') || {};
-      S.vpn = { state: 'on', cc: live.cc, name: live.name || 'VPN', server: live.server, since: live.since || Date.now() };
-    } else if (v.state === 'connecting') {
-      clearTimeout(failT); Object.assign(v, { state: 'on', since: Date.now() }); haptic('MEDIUM');
-      store.set('live', JSON.stringify({ cc: v.cc, name: v.name, server: { host: v.server.host, ip: v.server.ip }, since: v.since }));
-      toast(`Connected — you appear in ${v.name}`);
+    const fresh = v.state !== 'on';
+    S.vpn = { state: 'on', cc: v.cc || live.cc, name: v.name || live.name || 'VPN', list: v.list, server: e.server || v.server, since: e.since || v.since || Date.now() };
+    if (fresh) { haptic('MEDIUM'); toast(v.re ? 'Reconnected' : `Connected — you appear in ${S.vpn.name}`); }
+  } else if (busy) {
+    if (v.state === 'off' && !live.cc) return; // nothing was asked for
+    S.vpn = { ...v, state: 'connecting', cc: v.cc || live.cc, name: v.name || live.name || 'VPN', server: e.server || v.server, detail: e.detail || '', re: e.state === 'RECONNECTING' || v.state === 'on' || !!v.re };
+  } else if (e.state === 'ERROR') {
+    if (v.state === 'connecting' || v.state === 'on') {
+      S.vpn = { state: 'error', cc: v.cc, name: v.name, error: `None of the ${pl((v.list || []).length || TRY_SERVERS, 'server')} tried in ${v.name || 'that place'} answered. Tap connect to try again, or pick another place.` };
+      store.set('live', null); haptic('HEAVY'); grabLog();
     }
-  } else if (e.state === 'ERROR' && v.state === 'connecting') {
-    clearTimeout(failT); attempt(v, v.i + 1); return;
-  } else if (e.state === 'DISCONNECTED' && v.state === 'on') {
-    S.vpn = { state: 'off' }; store.set('live', null); toast('VPN disconnected');
+  } else if (e.state === 'DISCONNECTED') {
+    if (v.state === 'on' || v.state === 'connecting') { S.vpn = { state: 'off' }; store.set('live', null); if (Date.now() - offAt > 4000) toast('VPN disconnected'); }
   }
-  if (S.vpn.state === 'connecting') S.vpn.detail = e.detail || '';
-  render();
+  renderSoon();
 }
 
 async function handOff(filename, text, note) {
@@ -583,11 +585,11 @@ function vMain() {
   const v = S.vpn, t = target(), d = S.data;
   const st = v.state;
   const big = st === 'on' ? `<span class="grad-t">${esc(v.name)}</span>`
-    : st === 'connecting' ? 'Connecting…'
+    : st === 'connecting' ? (v.re ? 'Reconnecting…' : 'Connecting…')
     : st === 'handoff' ? `<span class="grad-t">${esc(v.name)}</span>`
     : 'Not connected';
-  const lead = st === 'on' ? `Everything you connect to sees you in <b>${esc(v.name)}</b>.<br><span class="mono">${esc(v.server?.host || '')} · ${esc(v.server?.ip || '')}</span>`
-    : st === 'connecting' ? `${esc(v.name)} · server ${v.i + 1} of ${v.list.length}${v.server ? ` <span class="mono">${esc(v.server.ip)}</span>` : ''}${v.detail ? ` · ${esc(v.detail.toLowerCase())}` : ''}`
+  const lead = st === 'on' ? `Everything you connect to sees you in <b>${esc(v.name)}</b>.<br><span class="mono">${esc(v.server || '')}</span>`
+    : st === 'connecting' ? `${esc(v.name)}${v.server ? ` · <span class="mono">${esc(v.server)}</span>` : ''}${v.detail ? ` · ${esc(v.detail.toLowerCase().replace(/_/g, ' '))}` : ''}${v.re ? '<br>Holding your traffic until the tunnel is back.' : ''}`
     : st === 'handoff' ? (v.how === 'shared' ? 'Pick your OpenVPN app in the share sheet and tap connect there.' : 'Connection file saved — open it with OpenVPN Connect.')
     : st === 'error' ? `${esc(v.error)} ${S.engine ? '<button class="link" data-act="log">Details</button>' : ''}`
     : t ? (BROWSER ? `Download the connection file for <b>${esc(t.name)}</b> and open it in OpenVPN Connect.` : `Tap connect to appear in <b>${esc(t.name)}</b>.`)
@@ -712,7 +714,11 @@ function vLog() {
 function renderSheet() { if (!S.sheet) return; $('#sheet-body').innerHTML = S.sheet === 'settings' ? vSettings() : S.sheet === 'log' ? vLog() : vAbout(); }
 
 /* ---------- render ----------------------------------------------------- */
+// render() paints now (taps answer at once); renderSoon() folds bursts (engine events, typing) into one frame.
+let rafId = 0;
+function renderSoon() { if (!rafId) rafId = requestAnimationFrame(() => { rafId = 0; render(); }); }
 function render() {
+  if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
   const a = document.activeElement, keep = a && a.dataset && a.dataset.input ? { k: a.dataset.input, p: a.selectionStart } : null;
   $('#app').innerHTML = vMain();
   if (S.sheet) renderSheet();
@@ -736,7 +742,8 @@ window.matchMedia('(min-width: 980px)').addEventListener?.('change', () => rende
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   ({
-    power: () => (S.vpn.state === 'on' || S.vpn.state === 'connecting') ? disconnect() : connect(),
+    // power: a second tap within 400 ms is an accidental double tap, not "cancel"
+    power: () => { const now = Date.now(); if (now - tapAt < 400) return; tapAt = now; (S.vpn.state === 'on' || S.vpn.state === 'connecting') ? disconnect() : connect(); },
     pick: () => choose(el.dataset.kind, el.dataset.code),
     reload: () => { haptic(); loadServers(true).then(() => { if (!S.loadErr) toast('Server list updated'); }); },
     desktop: () => shareDesktop(),
@@ -747,7 +754,7 @@ document.addEventListener('click', (e) => {
     theme: () => { setTheme(el.dataset.v); renderSheet(); },
   }[el.dataset.act] || (() => {}))();
 });
-document.addEventListener('input', (e) => { if (e.target.dataset.input === 'q') { S.q = e.target.value; render(); } });
+document.addEventListener('input', (e) => { if (e.target.dataset.input === 'q') { S.q = e.target.value; renderSoon(); } });
 try { P.App && P.App.addListener('backButton', () => { if ($('#sheet').open) closeSheet(); else P.App.minimizeApp(); }); } catch {}
 try { P.App && P.App.addListener('resume', () => { loadServers(false); syncEngine(); }); } catch {}
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') loadServers(false); });
@@ -755,7 +762,11 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 /* ---------- engine ----------------------------------------------------- */
 async function syncEngine() {
   if (!P.Vpn) return;
-  try { const s = await P.Vpn.getStatus(); S.engine = true; if (s && s.state) onEngine(s); else render(); } catch { S.engine = false; render(); }
+  try {
+    const s = await P.Vpn.getStatus(); S.engine = true;
+    // A poll must not cancel a connect that is waiting on Android's VPN dialog (which pauses the app).
+    if (s && s.state && !(S.vpn.state === 'connecting' && (s.state === 'DISCONNECTED' || s.state === 'ERROR'))) onEngine(s); else render();
+  } catch { S.engine = false; render(); }
 }
 
 /* ---------- boot ------------------------------------------------------- */

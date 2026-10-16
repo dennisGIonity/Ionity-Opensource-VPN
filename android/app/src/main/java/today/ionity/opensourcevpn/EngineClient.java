@@ -36,6 +36,8 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
     interface Listener {
         void onEvent(String name, String info, boolean error, boolean fatal);
         void onLog(String line);
+        /** The real tunnel interface is up (the placeholder can go). */
+        void onEstablished();
     }
 
     private final VpnService service;
@@ -43,6 +45,11 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
     private final String sessionName;
     private VpnService.Builder builder;
     private boolean hasV6;
+    private int dnsCount;
+    private volatile boolean connected;
+
+    /** True once this session reached CONNECTED at least once. */
+    boolean wasConnected() { return connected; }
 
     EngineClient(VpnService service, String sessionName, Listener listener) {
         this.service = service;
@@ -53,10 +60,12 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
     /** Parses the .ovpn; returns null when it is usable, otherwise the reason. */
     String load(String ovpn) {
         ClientAPI_Config c = new ClientAPI_Config();
-        c.setContent(ovpn);
+        c.setContent(withKeepalive(ovpn));
         c.setGuiVersion("Ionity VPN");
-        c.setConnTimeout(30);
-        c.setTunPersist(false);
+        // Per-attempt limit for reaching a server; the service then tries the next one.
+        c.setConnTimeout(20);
+        // Keep the tun interface across the engine's own reconnects (no gap, no leak, key stays up).
+        c.setTunPersist(true);
         c.setCompressionMode("asym");
         // VPN Gate (SoftEther) uses AES-128-CBC / SHA1 and older certificates. Those are in OpenSSL's default
         // provider; "legacy algorithms" (BF-CBC etc.) would need the legacy provider, which this build leaves out.
@@ -69,6 +78,15 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
         return ev.getError() ? ev.getMessage() : null;
     }
 
+    /**
+     * VPN Gate files carry no keepalive, so a dead path (mobile NAT timeout, server gone) was only
+     * noticed much later. Ping every 10 s and restart the session after 60 s of silence.
+     */
+    static String withKeepalive(String ovpn) {
+        if (java.util.regex.Pattern.compile("(?m)^\\s*(keepalive|ping|ping-restart)\\s").matcher(ovpn).find()) return ovpn;
+        return ovpn + "\nping 10\nping-restart 60\n";
+    }
+
     /** Runs the session; returns when it ends. */
     ClientAPI_Status run() { return connect(); }
 
@@ -76,6 +94,7 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
     @Override public boolean tun_builder_new() {
         builder = service.new Builder();
         hasV6 = false;
+        dnsCount = 0;
         return true;
     }
     @Override public boolean tun_builder_set_remote_address(String address, boolean ipv6) { return true; }
@@ -106,7 +125,7 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
         try {
             for (Map.Entry<Integer, DnsServer> e : dns.getServers().entrySet()) {
                 for (DnsAddress a : e.getValue().getAddresses()) {
-                    try { builder.addDnsServer(a.getAddress()); } catch (Exception ex) { log("dns " + a.getAddress() + ": " + ex.getMessage()); }
+                    try { builder.addDnsServer(a.getAddress()); dnsCount++; } catch (Exception ex) { log("dns " + a.getAddress() + ": " + ex.getMessage()); }
                 }
             }
             for (DnsDomain d : dns.getSearch_domains()) {
@@ -125,9 +144,16 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
     @Override public int tun_builder_establish() {
         try {
             builder.setSession(sessionName);
+            if (dnsCount == 0) {
+                // No DNS pushed: the phone's own (often the home router's) DNS is unreachable through
+                // the tunnel, which looks like "connected but nothing loads". Use public resolvers.
+                try { builder.addDnsServer("1.1.1.1"); builder.addDnsServer("8.8.8.8"); log("No DNS from the server; using 1.1.1.1 and 8.8.8.8"); }
+                catch (Exception ignored) { }
+            }
             if (Build.VERSION.SDK_INT >= 29) builder.setMetered(false);
             ParcelFileDescriptor pfd = builder.establish();
             if (pfd == null) { log("Android refused to create the VPN interface (VPN permission revoked?)"); return -1; }
+            listener.onEstablished();
             return pfd.detachFd(); // OpenVPN 3 owns and closes the fd from here
 
         } catch (Exception e) { log("establish: " + e.getMessage()); return -1; }
@@ -135,7 +161,10 @@ final class EngineClient extends ClientAPI_OpenVPNClient {
 
     /* ---------- the rest ---------- */
     @Override public boolean socket_protect(int socket, String remote, boolean ipv6) { return service.protect(socket); }
-    @Override public void event(ClientAPI_Event ev) { listener.onEvent(ev.getName(), ev.getInfo(), ev.getError(), ev.getFatal()); }
+    @Override public void event(ClientAPI_Event ev) {
+        if ("CONNECTED".equals(ev.getName())) connected = true;
+        listener.onEvent(ev.getName(), ev.getInfo(), ev.getError(), ev.getFatal());
+    }
     @Override public void log(ClientAPI_LogInfo li) { listener.onLog(li.getText().trim()); }
     @Override public boolean pause_on_connection_timeout() { return false; }
     // Pure virtual in OpenVPN 3: must be implemented even though this app uses none of them.

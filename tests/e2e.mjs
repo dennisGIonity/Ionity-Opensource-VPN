@@ -96,7 +96,7 @@ await test('continents: Asia resolves to its best-scoring country; empty contine
 await test('countries: search finds "South Korea" (VPN Gate calls it "Korea Republic of") and picking it sets the location', async (p) => {
   await ready(p);
   await p.fill('[data-input=q]', 'kor');
-  assert.equal(await p.locator('.li').count(), 1);
+  await p.waitForFunction(() => document.querySelectorAll('.li').length === 1); // typing repaints on the next frame
   await p.click('.li');
   assert.match(await p.textContent('.hero'), /appear in South Korea/);
   assert.match(await p.textContent('.stats'), /KR/);
@@ -127,33 +127,67 @@ await test('engine: one tap connects in-app to the best server; status shows the
   await tile(p, 'Asia').click();
   await p.click('[data-act=power]');
   await p.waitForFunction(() => window.__vpn.connect.length === 1);
-  assert.match((await p.evaluate(() => window.__vpn.connect[0].config)), /remote 203\.0\.113\.11 443/);
-  assert.match((await p.evaluate(() => window.__vpn.connect[0].config)), /^tls-cert-profile insecure$/m, 'engine accepts VPN Gate certificates');
+  const first = await p.evaluate(() => window.__vpn.connect[0].servers[0].config);
+  assert.match(first, /remote 203\.0\.113\.11 443/);
+  assert.match(first, /^tls-cert-profile insecure$/m, 'engine accepts VPN Gate certificates');
+  assert.match(first, /^ping 10$/m, 'keepalive so a dead path is noticed');
+  assert.match(first, /^ping-restart 60$/m);
   assert.match(await p.textContent('.hero'), /Connecting/);
   await p.evaluate(() => window.__emit({ state: 'CONNECTED' }));
   await p.waitForSelector('.power.on');
   assert.match(await p.textContent('#big'), /Japan/);
   assert.match(await p.textContent('.pill'), /JP/);
+  await p.click('[data-act=power]'); // within 400 ms of the first tap: ignored (accidental double tap)
+  assert.equal(await p.evaluate(() => window.__vpn.disconnect), 0, 'a double tap does not cancel at once');
+  await p.waitForTimeout(450);
   await p.click('[data-act=power]');
   await p.waitForSelector('.power:not(.on)');
   assert.equal(await p.evaluate(() => window.__vpn.disconnect), 1);
   assert.match(await p.textContent('#big'), /Not connected/);
 }, { engine: true });
 
-await test('engine: a server that fails is replaced by the next best in the same country, then a clear error after 3', async (p) => {
+await test('engine: the service gets the best 3 servers in order; when none answers there is a clear error', async (p) => {
   await ready(p);
   await tile(p, 'Asia').click();
   await p.click('[data-act=power]');
-  for (const ip of ['203.0.113.11', '203.0.113.12', '203.0.113.13']) {
-    await p.waitForFunction((ip) => window.__vpn.connect.at(-1)?.config.includes(ip), ip);
-    await p.evaluate(() => window.__emit({ state: 'ERROR', detail: 'TLS handshake failed' }));
-  }
+  await p.waitForFunction(() => window.__vpn.connect.length === 1);
+  const hosts = await p.evaluate(() => window.__vpn.connect[0].servers.map((s) => s.config.match(/remote (\S+)/)[1]));
+  assert.deepEqual(hosts, ['203.0.113.11', '203.0.113.12', '203.0.113.13'], 'never the 4th (low-score) server');
+  await p.evaluate(() => window.__emit({ state: 'CONNECTING', detail: 'WAIT', server: 'vpn2 · 203.0.113.12' }));
+  await p.waitForFunction(() => document.querySelector('.hero').textContent.includes('203.0.113.12'));
+  await p.evaluate(() => window.__emit({ state: 'ERROR', detail: 'NO_SERVER' }));
   await p.waitForSelector('.dot.bad');
-  assert.equal(await p.evaluate(() => window.__vpn.connect.length), 3, 'never tries the 4th (low-score) server');
+  assert.equal(await p.evaluate(() => window.__vpn.connect.length), 1);
   assert.match(await p.textContent('.hero'), /None of the 3 servers tried in Japan answered/);
   await p.click('[data-act=log]');
   await p.waitForSelector('#sheet[open]');
   assert.match(await p.textContent('#sheet'), /TLS handshake failed/);
+}, { engine: true });
+
+await test('engine: a dropped tunnel shows Reconnecting and comes back by itself', async (p) => {
+  await ready(p);
+  await tile(p, 'Asia').click();
+  await p.click('[data-act=power]');
+  await p.evaluate(() => window.__emit({ state: 'CONNECTED', server: 'vpn1 · 203.0.113.11', since: Date.now() - 5000 }));
+  await p.waitForSelector('.power.on');
+  await p.evaluate(() => window.__emit({ state: 'RECONNECTING', detail: 'RECONNECTING' }));
+  await p.waitForFunction(() => /Reconnecting/.test(document.querySelector('#big').textContent));
+  assert.equal(await p.evaluate(() => window.__vpn.connect.length), 1, 'the service reconnects, the app does not start a new one');
+  await p.evaluate(() => window.__emit({ state: 'CONNECTED', server: 'vpn1 · 203.0.113.11' }));
+  await p.waitForSelector('.power.on');
+  assert.match(await p.textContent('#big'), /Japan/);
+  assert.match(await p.textContent('#toast'), /Reconnected/);
+}, { engine: true });
+
+await test('engine: returning from the VPN permission dialog does not cancel the connect', async (p) => {
+  await ready(p);
+  await tile(p, 'Asia').click();
+  await p.click('[data-act=power]');
+  await p.waitForFunction(() => window.__vpn.connect.length === 1);
+  await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await p.evaluate(() => syncEngine());
+  await p.waitForTimeout(100);
+  assert.match(await p.textContent('#big'), /Connecting/);
 }, { engine: true });
 
 await test('engine: changing the place while connected switches the tunnel live', async (p) => {
@@ -164,7 +198,7 @@ await test('engine: changing the place while connected switches the tunnel live'
   await p.waitForSelector('.power.on');
   await p.fill('[data-input=q]', 'united states'); await p.click('.li');
   await p.waitForFunction(() => window.__vpn.connect.length === 2);
-  assert.match(await p.evaluate(() => window.__vpn.connect[1].config), /remote 198\.51\.100\.31 443/);
+  assert.match(await p.evaluate(() => window.__vpn.connect[1].servers[0].config), /remote 198\.51\.100\.31 443/);
   await p.evaluate(() => window.__emit({ state: 'CONNECTED' }));
   await p.waitForSelector('.power.on');
   assert.match(await p.textContent('#big'), /United States/);
